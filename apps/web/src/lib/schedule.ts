@@ -1,10 +1,10 @@
 import "server-only";
 import { join } from "node:path";
-import { and, asc, eq, lte } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, lte, ne } from "drizzle-orm";
 import { db, schema } from "@flock/db";
 import { momentOf, type EventContent, type Moment } from "@flock/templates";
 import { linkedinStatus, publishToLinkedIn } from "./connectors/linkedin";
-import { publishToSlack, slackStatus } from "./connectors/slack";
+import { cancelInSlack, publishToSlack, scheduleInSlack, slackStatus } from "./connectors/slack";
 import { STORAGE_DIR } from "./paths";
 
 export type Channel = "slack" | "linkedin";
@@ -94,6 +94,9 @@ export async function schedulePost(input: { eventId: string; channel: Channel; m
 }
 
 export async function cancelPost(postId: string) {
+  const [post] = await db.select().from(schema.scheduledPosts).where(eq(schema.scheduledPosts.id, postId));
+  // Si ya estaba programada en Slack mismo, se borra también allá
+  if (post?.externalUrl?.startsWith("slack:scheduled:")) await cancelInSlack(post.externalUrl);
   await db
     .update(schema.scheduledPosts)
     .set({ status: "cancelled" })
@@ -118,14 +121,17 @@ async function publish(post: typeof schema.scheduledPosts.$inferSelect) {
   try {
     const file = join(STORAGE_DIR, post.eventId, post.pieceFile);
     // El texto vigente (pudo editarse en el chat después de programar); la imagen se regenera en el mismo archivo
-    const text = (await publishingPlan(post.eventId, post.channel)).find((p) => p.moment === post.moment)?.text ?? post.text;
+    const text =
+      post.channel === "linkedin" && post.moment
+        ? ((await publishingPlan(post.eventId, post.channel)).find((p) => p.moment === post.moment)?.text ?? post.text)
+        : post.text; // en Slack el texto lo escribe la persona al programar
     const result =
       post.channel === "slack"
         ? await publishToSlack({ file, text, channel: post.target })
         : await publishToLinkedIn({ file, text, alt: text.split("\n")[0].slice(0, 300) });
     await db
       .update(schema.scheduledPosts)
-      .set({ status: "published", publishedAt: new Date(), externalUrl: result.url, text })
+      .set({ status: "published", publishedAt: new Date(), externalUrl: result.url, text, publishedVia: "app" })
       .where(eq(schema.scheduledPosts.id, post.id));
     return result;
   } catch (err) {
@@ -146,11 +152,106 @@ export async function dispatchDue() {
     .where(and(eq(schema.scheduledPosts.status, "scheduled"), lte(schema.scheduledPosts.scheduledAt, new Date())));
   const status = connectorStatus();
   for (const post of due) {
+    // Programada en Slack mismo: la publicó Slack
+    if (post.externalUrl?.startsWith("slack:scheduled:")) {
+      await db.update(schema.scheduledPosts).set({ status: "published", publishedAt: post.scheduledAt, publishedVia: "app" }).where(eq(schema.scheduledPosts.id, post.id));
+      continue;
+    }
     if (!status[post.channel].connected) {
-      const error = `Venció pero ${post.channel === "slack" ? "Slack" : "LinkedIn"} no está conectado: se publica apenas se conecte.`;
+      const error = `Ya es la hora y ${post.channel === "slack" ? "Slack" : "LinkedIn"} no está conectado: publicala a mano (descargá la imagen y copiá el texto) y marcala como publicada.`;
       if (post.error !== error) await db.update(schema.scheduledPosts).set({ error }).where(eq(schema.scheduledPosts.id, post.id));
       continue;
     }
     await publish(post).catch((err) => console.warn(`[publicaciones] ${post.channel} ${post.id}: ${err.message}`));
   }
+}
+
+// ─── Slack: cualquier pieza, texto libre, canal y fecha elegidos ───────────
+
+export type SlackPiece = { file: string; label: string; text: string; moment: Moment | null; suggestedAt: string };
+
+/** Piezas del evento que se pueden mandar a Slack (imágenes), con un texto sugerido para cada una. */
+export async function slackPieces(eventId: string): Promise<SlackPiece[]> {
+  const [event] = await db.select().from(schema.events).where(eq(schema.events.id, eventId));
+  if (!event) return [];
+  const content = event.content as EventContent | null;
+  const pieces = await db.select().from(schema.pieces).where(eq(schema.pieces.eventId, eventId)).orderBy(asc(schema.pieces.createdAt));
+  const [first] = await db.select().from(schema.agendaItems).where(eq(schema.agendaItems.eventId, eventId)).orderBy(asc(schema.agendaItems.position)).limit(1);
+  // Horario sugerido según el momento de la pieza; las piezas sin momento (cronograma, credenciales…), el día anterior
+  const suggest = (m: Moment | null) =>
+    (event.date ? suggestedTime(m ?? "antes", m ? event.date : addDays(event.date, 2), first?.startsAt, "slack") : new Date(Date.now() + 864e5)).toISOString();
+  return pieces
+    .filter((p) => p.file?.endsWith(".png"))
+    .map((p) => {
+      const file = p.file!;
+      const label = (p.data as { label?: string }).label ?? file;
+      const slack = content?.slack?.find((m) => file === `slack/${m.id}.png`);
+      const post = content?.linkedin.find((l) => file.startsWith(`linkedin/${l.id}-`));
+      const text = slack?.text ?? post?.post ?? `${label} · ${event.name}${event.hashtag ? ` ${event.hashtag}` : ""}`;
+      const moment = slack?.moment ?? (post ? momentOf(post) : null);
+      return { file, label, text, moment, suggestedAt: suggest(moment) };
+    });
+}
+
+/** Programa una pieza en un canal de Slack. Sin conector, queda agendada para publicarla a mano. */
+export async function scheduleSlackPost(input: { eventId: string; pieceFile: string; text: string; target: string; scheduledAt: Date }) {
+  const piece = (await slackPieces(input.eventId)).find((p) => p.file === input.pieceFile);
+  if (!piece) throw new Error("Esa pieza no existe en el evento");
+  if (!input.text.trim()) throw new Error("Escribí el texto del mensaje");
+  if (!input.target.trim()) throw new Error("Elegí el canal");
+  if (Number.isNaN(input.scheduledAt.getTime())) throw new Error("Fecha inválida");
+  const [row] = await db
+    .insert(schema.scheduledPosts)
+    .values({
+      eventId: input.eventId,
+      channel: "slack",
+      moment: piece.moment,
+      pieceFile: piece.file,
+      pieceLabel: piece.label,
+      text: input.text.trim(),
+      target: normalizeChannel(input.target),
+      scheduledAt: input.scheduledAt,
+    })
+    .returning();
+  // Con la app de Slack conectada y la programación nativa activa, Slack la publica aunque la app esté cerrada
+  if (slackStatus().connected && slackStatus().nativeSchedule) {
+    await scheduleInSlack({ file: join(STORAGE_DIR, input.eventId, piece.file), text: row.text, channel: row.target!, at: row.scheduledAt })
+      .then((r) => db.update(schema.scheduledPosts).set({ externalUrl: r.ref }).where(eq(schema.scheduledPosts.id, row.id)))
+      .catch((err) => db.update(schema.scheduledPosts).set({ error: `Slack: ${err.message}` }).where(eq(schema.scheduledPosts.id, row.id)));
+  }
+  return row;
+}
+
+/** "#General " → "#general"; los ids de canal (C0123…) quedan como están. */
+const normalizeChannel = (c: string) => {
+  const t = c.trim();
+  return /^[CG][A-Z0-9]{6,}$/.test(t) ? t : `#${t.replace(/^#/, "").toLowerCase().replace(/\s+/g, "-")}`;
+};
+
+/** Publicaciones de Slack del evento, de la próxima a la última. */
+export async function slackSchedule(eventId: string) {
+  return db
+    .select()
+    .from(schema.scheduledPosts)
+    .where(and(eq(schema.scheduledPosts.eventId, eventId), eq(schema.scheduledPosts.channel, "slack"), ne(schema.scheduledPosts.status, "cancelled")))
+    .orderBy(asc(schema.scheduledPosts.scheduledAt));
+}
+
+/** Canales sugeridos: los de SLACK_CHANNELS y los que ya se usaron. */
+export async function knownSlackChannels() {
+  const used = await db
+    .selectDistinct({ target: schema.scheduledPosts.target })
+    .from(schema.scheduledPosts)
+    .where(and(eq(schema.scheduledPosts.channel, "slack"), isNotNull(schema.scheduledPosts.target)))
+    .orderBy(desc(schema.scheduledPosts.target));
+  const configured = (process.env.SLACK_CHANNELS ?? "").split(",").map((c) => c.trim()).filter(Boolean).map(normalizeChannel);
+  return [...new Set([...configured, ...used.map((u) => u.target!)])].sort();
+}
+
+/** Marca una publicación como hecha a mano (sin conector). */
+export async function markPublished(postId: string) {
+  await db
+    .update(schema.scheduledPosts)
+    .set({ status: "published", publishedAt: new Date(), publishedVia: "manual", error: null })
+    .where(and(eq(schema.scheduledPosts.id, postId), ne(schema.scheduledPosts.status, "cancelled")));
 }

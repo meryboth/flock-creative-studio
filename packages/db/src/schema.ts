@@ -248,13 +248,15 @@ export const scheduledPosts = pgTable(
     id: id(),
     eventId: uuid("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
     channel: publishChannel("channel").notNull(),
-    moment: text("moment").notNull(), // antes | durante | despues
+    moment: text("moment"), // antes | durante | despues; vacío si se eligió una pieza suelta
     pieceFile: text("piece_file").notNull(), // imagen que se publica, relativa a la carpeta del evento
+    pieceLabel: text("piece_label"), // nombre legible de la pieza (para el calendario)
     text: text("text").notNull(),
     target: text("target"), // canal de Slack (id); en LinkedIn, la página o perfil del token
     scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
     status: scheduleStatus("status").notNull().default("scheduled"),
     externalUrl: text("external_url"),
+    publishedVia: text("published_via"), // "app" (conector) | "manual" (marcada a mano)
     error: text("error"),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     createdAt: createdAt(),

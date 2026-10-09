@@ -1,7 +1,7 @@
 import "server-only";
 import { db, schema } from "@flock/db";
 import { MOMENT_LABEL, type Moment } from "@flock/templates";
-import { desc } from "drizzle-orm";
+import { desc, ne } from "drizzle-orm";
 import { publishingPlan, type Channel } from "./schedule";
 
 export const TZ = "America/Argentina/Buenos_Aires";
@@ -16,6 +16,7 @@ export type CalendarItem = {
   title: string;
   moment?: Moment;
   status?: string; // estado de la programación
+  target?: string; // canal de Slack
   eventId: string;
   eventName: string;
 };
@@ -30,6 +31,7 @@ export const dayKey = (d: Date) => dayFmt.format(d);
  */
 export async function calendarItems(): Promise<CalendarItem[]> {
   const events = await db.select().from(schema.events).orderBy(desc(schema.events.createdAt));
+  const rows = await db.select().from(schema.scheduledPosts).where(ne(schema.scheduledPosts.status, "cancelled"));
   const today = dayKey(new Date());
   const items: CalendarItem[] = [];
 
@@ -48,38 +50,41 @@ export async function calendarItems(): Promise<CalendarItem[]> {
     });
     // Las sugerencias solo tienen sentido para eventos que todavía no terminaron de comunicarse
     const finished = event.date < addDays(today, -1);
+    const mine = rows.filter((r) => r.eventId === event.id);
+    // Todo lo programado (por momento o una pieza suelta)
+    for (const r of mine)
+      items.push({
+        key: r.id,
+        kind: "scheduled",
+        channel: r.channel,
+        at: r.scheduledAt,
+        day: dayKey(r.scheduledAt),
+        time: timeFmt.format(r.scheduledAt),
+        title: r.pieceLabel ?? r.pieceFile,
+        moment: (r.moment as Moment | null) ?? undefined,
+        status: r.status,
+        target: r.target ?? undefined,
+        eventId: event.id,
+        eventName: event.name,
+      });
+    // Lo que conviene programar y todavía no se programó
+    if (finished) continue;
     for (const channel of ["linkedin", "slack"] as Channel[]) {
       for (const p of await publishingPlan(event.id, channel)) {
-        const s = p.scheduled;
-        if (s) {
-          items.push({
-            key: s.id,
-            kind: "scheduled",
-            channel,
-            at: s.scheduledAt,
-            day: dayKey(s.scheduledAt),
-            time: timeFmt.format(s.scheduledAt),
-            title: p.headline,
-            moment: p.moment,
-            status: s.status,
-            eventId: event.id,
-            eventName: event.name,
-          });
-        } else if (!finished) {
-          const at = new Date(p.suggestedAt);
-          items.push({
-            key: `${event.id}-${channel}-${p.moment}`,
-            kind: "suggested",
-            channel,
-            at,
-            day: dayKey(at),
-            time: timeFmt.format(at),
-            title: p.headline,
-            moment: p.moment,
-            eventId: event.id,
-            eventName: event.name,
-          });
-        }
+        if (mine.some((r) => r.channel === channel && r.moment === p.moment)) continue;
+        const at = new Date(p.suggestedAt);
+        items.push({
+          key: `${event.id}-${channel}-${p.moment}`,
+          kind: "suggested",
+          channel,
+          at,
+          day: dayKey(at),
+          time: timeFmt.format(at),
+          title: p.headline,
+          moment: p.moment,
+          eventId: event.id,
+          eventName: event.name,
+        });
       }
     }
   }

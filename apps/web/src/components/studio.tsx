@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { PixelLoader } from "./processing";
+import { SCHEDULE_SLACK_EVENT } from "./slack-scheduler";
 
 export type StudioPiece = { file: string; url: string; kind: "png" | "txt" | "html" | "pdf"; label: string; text?: string; previewUrl?: string; badge?: string };
 // toolbar: accionables del grupo (programar publicaciones, descargar, sincronizar nómina)
@@ -147,6 +148,16 @@ export function Studio({ eventId, groups, history, running }: { eventId: string;
                       </span>
                       <span className="flex shrink-0 items-center gap-2">
                         {isSelected && <span className="sticker bg-yellow text-[11px]">elegida</span>}
+                        {p.kind === "png" && (
+                          <button
+                            type="button"
+                            onClick={() => window.dispatchEvent(new CustomEvent(SCHEDULE_SLACK_EVENT, { detail: p.file }))}
+                            className="label-mono text-muted underline underline-offset-4 hover:text-ink"
+                            aria-label={`Programar ${p.label} en Slack`}
+                          >
+                            slack
+                          </button>
+                        )}
                         <a href={p.url} target="_blank" rel="noreferrer" className="label-mono text-muted underline underline-offset-4 hover:text-ink">
                           abrir
                         </a>

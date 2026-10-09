@@ -197,7 +197,8 @@ function Chip({ item, dim }: { item: CalendarItem; dim?: boolean }) {
         <span className="shrink-0 font-mono opacity-80">{item.time}</span>
       </span>
       <span className="block truncate opacity-90">
-        {momentLabel(item.moment)} · {item.eventName}
+        {item.target ? `${item.target} · ` : item.moment ? `${momentLabel(item.moment)} · ` : ""}
+        {item.eventName}
       </span>
       {scheduled && item.status !== "scheduled" && <span className="block font-mono text-[10px] uppercase">{STATUS[item.status!] ?? item.status}</span>}
     </Link>

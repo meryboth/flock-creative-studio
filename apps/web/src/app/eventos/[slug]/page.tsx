@@ -4,9 +4,10 @@ import { MOMENT_LABEL, momentOf, STYLES, type EventContent } from "@flock/templa
 import { AutoRefresh } from "@/components/auto-refresh";
 import { GenerationProgress } from "@/components/progress-views";
 import { PublishPlanner } from "@/components/publish-planner";
+import { SlackScheduler } from "@/components/slack-scheduler";
 import { CredentialsActions } from "@/components/roster-sync";
 import { Studio, type StudioGroup, type StudioHistoryItem } from "@/components/studio";
-import { connectorStatus, publishingPlan, type Channel } from "@/lib/schedule";
+import { connectorStatus, knownSlackChannels, publishingPlan, slackPieces, slackSchedule, type Channel } from "@/lib/schedule";
 import { describeOperation, listChanges } from "@/lib/editor";
 import { listPieces, readText, storageUrl } from "@/lib/pieces";
 import type { EditOperation } from "@flock/agents";
@@ -168,13 +169,16 @@ async function StudioSection({ event, pieces, running }: { event: EventRow; piec
   }));
   const toolbars: Record<string, React.ReactNode> = {
     linkedin: <Planner eventId={eventId} channel="linkedin" v={v} />,
-    slack: <Planner eventId={eventId} channel="slack" v={v} />,
+    slack: <SlackSection eventId={eventId} v={v} />,
     credenciales: <CredentialsActions eventId={eventId} roster={event.roster as RosterInfo | null} suggestedUrl={await lastRosterUrl()} />,
   };
+  const visible = groups.filter((g) => g.pieces.length);
+  // Eventos sin piezas de Slack: el panel de Slack va con LinkedIn
+  if (!visible.some((g) => g.id === "slack")) toolbars.linkedin = [toolbars.linkedin, toolbars.slack];
   return (
     <Studio
       eventId={eventId}
-      groups={groups.filter((g) => g.pieces.length).map((g) => ({ ...g, toolbar: running ? null : toolbars[g.id] }))}
+      groups={visible.map((g) => ({ ...g, toolbar: running ? null : toolbars[g.id] }))}
       history={history}
       running={running}
     />
@@ -187,6 +191,32 @@ function momentBadges(content: EventContent | null) {
   for (const p of content?.linkedin ?? []) map.set(`linkedin/${p.id}`, MOMENT_LABEL[momentOf(p)]);
   for (const m of content?.slack ?? []) map.set(`slack/${m.id}`, MOMENT_LABEL[m.moment]);
   return map;
+}
+
+/** Slack: cualquier pieza, con canal y día elegidos (con o sin la app de Slack conectada). */
+async function SlackSection({ eventId, v }: { eventId: string; v: number }) {
+  const [pieces, posts, channels] = await Promise.all([slackPieces(eventId), slackSchedule(eventId), knownSlackChannels()]);
+  if (!pieces.length) return null;
+  const url = (file: string) => `${storageUrl(`${eventId}/${file}`)}?v=${v}`;
+  return (
+    <SlackScheduler
+      eventId={eventId}
+      pieces={pieces.map((p) => ({ file: p.file, label: p.label, text: p.text, imageUrl: url(p.file), suggestedAt: p.suggestedAt }))}
+      posts={posts.map((p) => ({
+        id: p.id,
+        pieceLabel: p.pieceLabel ?? p.pieceFile,
+        imageUrl: url(p.pieceFile),
+        text: p.text,
+        target: p.target,
+        scheduledAt: p.scheduledAt.toISOString(),
+        status: p.status,
+        error: p.error,
+        publishedVia: p.publishedVia,
+      }))}
+      channels={channels}
+      connected={connectorStatus().slack.connected}
+    />
+  );
 }
 
 async function Planner({ eventId, channel, v }: { eventId: string; channel: Channel; v: number }) {
