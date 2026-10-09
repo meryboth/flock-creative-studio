@@ -1,4 +1,4 @@
-import { contrast, ensureContrast, type EventKit, type HideableElement, type PieceOptions } from "@flock/templates";
+import { contrast, ensureContrast, type Devices, type EventKit, type HideableElement, type Layout, type PieceOptions } from "@flock/templates";
 import type { PieceAdjust, PieceType } from "./generate";
 
 /** Grupos de piezas para el alcance "este tipo de pieza". */
@@ -32,6 +32,8 @@ export type Patch = {
   titleScale?: number;
   visualScale?: number;
   hide?: Partial<Record<HideableElement, boolean>>;
+  layout?: Layout;
+  devices?: Partial<Devices>;
 };
 
 /** Cambios guardados de un evento, en cascada: todas las piezas → grupo → pieza. */
@@ -48,6 +50,7 @@ export function mergePatch(base: Patch = {}, next: Patch = {}): Patch {
     colors: { ...base.colors, ...next.colors },
     fonts: { ...base.fonts, ...next.fonts },
     hide: { ...base.hide, ...next.hide },
+    devices: { ...base.devices, ...next.devices },
   };
 }
 
@@ -90,6 +93,10 @@ export function applyPatch(kit: EventKit, patch: Patch): PieceAdjust {
       ...kit.style,
       palette,
       fonts: { ...kit.style.fonts, ...patch.fonts },
+      // una fuente pedida a mano no hereda el ajuste de la combinación original
+      display: patch.fonts?.display ? undefined : kit.style.display,
+      layout: patch.layout ?? kit.style.layout,
+      devices: { ...kit.style.devices, ...patch.devices },
       displayOverride: {
         ...kit.style.displayOverride,
         ...(patch.case ? { transform: patch.case === "upper" ? "uppercase" : patch.case === "lower" ? "lowercase" : "none" } : {}),

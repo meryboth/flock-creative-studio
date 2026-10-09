@@ -9,7 +9,7 @@ import { ProcessSteps, useElapsed } from "./processing";
  */
 export function AnalysisProgress({ running, images = 1 }: { running: boolean; images?: number }) {
   const elapsed = useElapsed(running);
-  const active = elapsed < 1 ? 0 : elapsed < 3 ? 1 : 2;
+  const active = elapsed < 1 ? 0 : elapsed < 3 ? 1 : elapsed < 14 ? 2 : 3;
   return (
     <div className="border-[1.5px] border-ink bg-surface p-5">
       <p className="mb-4 font-hand text-2xl font-bold leading-none">leyendo tu referencia…</p>
@@ -17,7 +17,8 @@ export function AnalysisProgress({ running, images = 1 }: { running: boolean; im
         steps={[
           { label: images > 1 ? `Subiendo ${images} imágenes` : "Subiendo la imagen" },
           { label: "Midiendo los colores" },
-          { label: "Leyendo el estilo con IA", detail: "tipografía, formas, textura y clima" },
+          { label: "Leyendo el estilo con IA", detail: "tipografía, composición, recursos y clima" },
+          { label: "Comparando una pieza de prueba con tu referencia", detail: "un crítico con visión ajusta lo que no se parece" },
           { label: "Armando el estilo" },
         ]}
         active={active}

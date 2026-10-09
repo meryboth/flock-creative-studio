@@ -2,7 +2,11 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { analyzeMoodboard, analyzeReference } from "@flock/agents";
-import { UPLOADS_DIR } from "@/lib/paths";
+import { refineReferenceStyle, type RefineStep } from "@flock/studio";
+import { REPO_ROOT, UPLOADS_DIR } from "@/lib/paths";
+
+// Rondas del crítico de fidelidad (0 lo apaga). Cada ronda suma ~5 s.
+const CRITIC_ROUNDS = Number(process.env.CRITIC_ROUNDS ?? 1);
 
 const ALLOWED = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 const MAX_FILES = 15;
@@ -35,7 +39,18 @@ export async function POST(req: Request) {
     let referenceError: string | null = null;
     try {
       reference = await analyzeReference(paths);
-      await writeFile(join(dir, "reference.json"), JSON.stringify(reference, null, 2));
+      // Crítico: renderiza un posteo con la lectura, lo compara con la referencia (y con el AI Day) y ajusta
+      let critique: RefineStep[] | undefined;
+      if (CRITIC_ROUNDS > 0) {
+        try {
+          const refined = await refineReferenceStyle({ references: paths, style: reference.style, repoRoot: REPO_ROOT, rounds: CRITIC_ROUNDS });
+          reference = { ...reference, style: refined.style };
+          critique = refined.history;
+        } catch (err) {
+          console.warn("[crítico]", err instanceof Error ? err.message : err);
+        }
+      }
+      await writeFile(join(dir, "reference.json"), JSON.stringify({ ...reference, critique }, null, 2));
     } catch (err) {
       referenceError = err instanceof Error ? err.message : String(err);
       console.warn("[referencia]", referenceError);

@@ -10,6 +10,7 @@
     "typecheck": "tsc"
   },
   "dependencies": {
+    "@flock/agents": "workspace:*",
     "@flock/renderer": "workspace:*",
     "@flock/templates": "workspace:*",
     "read-excel-file": "5.8.0"

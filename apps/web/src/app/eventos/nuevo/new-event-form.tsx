@@ -42,7 +42,7 @@ export type LibraryOption = { id: string; name: string; description: string; col
 export function NewEventForm({ styles, library, initialLibraryId }: { styles: StyleOption[]; library: LibraryOption[]; initialLibraryId?: string }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createEventAction, {});
   const [fields, setFields] = useState({ name: "", date: "", location: "", language: "es", description: "", hashtag: "", tagline: "" });
-  const [styleId, setStyleId] = useState<string>(initialLibraryId ? `lib:${initialLibraryId}` : "iridiscente");
+  const [styleId, setStyleId] = useState<string>(initialLibraryId ? `lib:${initialLibraryId}` : "flock");
   const [colors, setColors] = useState<Record<string, { accent: string; accent2: string }>>(() =>
     Object.fromEntries(styles.map((s) => [s.id, { accent: s.defaults.accent, accent2: s.defaults.accent2 ?? s.defaults.accent }])),
   );

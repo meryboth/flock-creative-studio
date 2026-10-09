@@ -51,6 +51,9 @@ const NEGATIVE_BY_MEDIUM: Record<string, string> = {
   "flat-vector": "3d, photo, realistic, gradient mesh, texture",
   "hand-drawn": "3d, photo, realistic",
   "3d-render": "flat, sketch, photo of people",
+  "line-art-halftone": "3d, photo, realistic, gradient, soft shading, color fill everywhere",
+  risograph: "3d, photo, realistic, glossy, smooth gradient",
+  collage: "3d render, glossy, cartoon",
 };
 
 const negativeFor = (medium?: string) => [NEGATIVE, NEGATIVE_BY_MEDIUM[medium ?? ""]].filter(Boolean).join(", ");
@@ -361,6 +364,9 @@ const MEDIUM_PHRASE: Record<string, string> = {
   "3d-render": "glossy 3D render, studio lighting",
   photo: "photographic object",
   "abstract-gradient": "abstract shape with smooth gradients",
+  "line-art-halftone": "quirky cartoon line art with thick black outlines, white fill and halftone dot shading, retro comic sticker",
+  risograph: "risograph print illustration, two or three flat spot colors, visible grain and slight misregistration",
+  collage: "paper cut-out collage, torn edges, layered flat colors, analog texture",
 };
 
 /**

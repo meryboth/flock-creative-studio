@@ -1,9 +1,9 @@
 export * from "./kit.js";
 export { resolveAssets, dataUri, type AssetMode } from "./assets.js";
 export { buildKit, defaultHashtag, type KitInput } from "./build-kit.js";
-export { FONT_CATALOG, fontFilePath } from "./fonts.js";
+export { FONT_CATALOG, DISPLAY_FONTS, BODY_FONTS, fontMeta, fontFilePath, type FontMeta } from "./fonts.js";
 export { derivePalette, paletteFromReference, ensureContrast, contrast, DEFAULT_SEEDS } from "./palette.js";
-export { STYLES, STYLE_LIST, resolveStyle, styleFromReference, type StyleDef } from "./styles.js";
+export { STYLES, STYLE_LIST, resolveStyle, styleFromReference, layoutOf, type StyleDef, type FontPair } from "./styles.js";
 export { t, formatLongDate, dateLabel } from "./i18n.js";
 export { agendaSlide, agendaSummary } from "./templates/agenda.js";
 export { certificate } from "./templates/certificate.js";

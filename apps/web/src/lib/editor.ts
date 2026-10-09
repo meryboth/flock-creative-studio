@@ -14,6 +14,7 @@ export type Scope = { kind: "all" } | { kind: "group"; group: PieceGroup } | { k
 
 const COLOR_LABEL: Record<string, string> = { ground: "fondo", ink: "texto", accent: "acento", accent2: "acento 2", muted: "texto secundario" };
 const ELEMENT_LABEL: Record<string, string> = { hashtag: "hashtag", tagline: "frase", date: "fecha", visual: "visual" };
+const LAYOUT_LABEL: Record<string, string> = { clasico: "clásica", tipografico: "tipográfica", bloques: "en bloques" };
 const CASE_LABEL: Record<string, string> = { upper: "MAYÚSCULAS", title: "normal", lower: "minúsculas" };
 
 /** Etiqueta corta de una operación, para mostrarla como chip en el chat. */
@@ -37,8 +38,12 @@ export function describeOperation(o: EditOperation): string {
       return `mostrar ${ELEMENT_LABEL[o.element!]}`;
     case "setCopy":
       return `${o.field === "headline" ? "titular" : "bajada"}: "${o.text}"`;
+    case "setLayout":
+      return `composición ${LAYOUT_LABEL[o.value!] ?? o.value}`;
+    case "setDevice":
+      return `${o.number ? "sumar" : "sacar"} ${o.value === "pills" ? "píldoras" : "semitono"}`;
     case "newVariant":
-      return "otra variante del visual";
+      return "otra variante";
     case "regenerateKeyVisual":
       return `key visual nuevo: ${o.prompt}`;
   }
@@ -99,6 +104,7 @@ export async function proposeChange(eventId: string, message: string, pieceFile:
     event: { name: event.name, style: style.styleId === "referencia" ? "derivado de una referencia" : STYLES[style.styleId].name },
     palette: { ground: kit.style.palette.ground, ink: kit.style.palette.ink, accent: kit.style.palette.accent, accent2: kit.style.palette.accent2 },
     fonts: kit.style.fonts,
+    layout: kit.style.layout,
     piece: piece
       ? { file: piece.file!, label: (piece.data as { label?: string }).label ?? piece.file!, group: GROUP_LABEL[groupOf(piece.type as PieceType)], headline: post?.headline, body: post?.body }
       : null,
@@ -142,6 +148,8 @@ export async function applyChange(changeId: string, scope: Scope) {
     if (o.op === "setTitleScale") patch.titleScale = o.number;
     if (o.op === "setVisualScale") patch.visualScale = o.number;
     if (o.op === "hide" || o.op === "show") patch.hide = { ...patch.hide, [o.element!]: o.op === "hide" };
+    if (o.op === "setLayout") patch.layout = o.value as Patch["layout"];
+    if (o.op === "setDevice") patch.devices = { ...patch.devices, [o.value!]: o.number === 1 };
   }
   if (Object.keys(patch).length) overrides = addPatch(overrides, patch, scope);
 

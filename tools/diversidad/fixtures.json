@@ -1,0 +1,42 @@
+{
+  "editorial-serif": {
+    "description": "Revista editorial: serif de alto contraste en tamaño grande, papel crema, mucho aire y un rojo profundo como único acento.",
+    "mood": ["editorial", "sobrio", "cálido"],
+    "scheme": "light",
+    "colors": { "ground": "#f3ede2", "ink": "#1a1714", "accent": "#a3261c", "accent2": "#d9cbb3", "shapes": ["#a3261c", "#1a1714", "#d9cbb3"] },
+    "typography": { "display": "Instrument Serif", "body": "Manrope", "case": "title", "weight": "regular", "width": "normal" },
+    "generator": "grid",
+    "texture": "none",
+    "corners": "sharp",
+    "ground": "flat",
+    "layout": "tipografico",
+    "devices": { "pills": false, "halftone": false }
+  },
+  "suiza": {
+    "description": "Estilo tipográfico internacional: grotesca negra en mayúsculas, grilla estricta, blanco, negro y un rojo plano.",
+    "mood": ["racional", "directo", "moderno"],
+    "scheme": "light",
+    "colors": { "ground": "#ffffff", "ink": "#111111", "accent": "#e3000f", "accent2": "#111111", "shapes": ["#e3000f", "#111111", "#d8d8d8"] },
+    "typography": { "display": "Archivo", "body": "Archivo", "case": "upper", "weight": "black", "width": "normal" },
+    "generator": "grid",
+    "texture": "none",
+    "corners": "sharp",
+    "ground": "flat",
+    "layout": "bloques",
+    "devices": { "pills": false, "halftone": false }
+  },
+  "collage-riso": {
+    "description": "Collage impreso en risografía: rosa flúor y azul sobre papel, tramas de puntos, recortes y etiquetas redondeadas.",
+    "mood": ["lúdico", "artesanal", "joven"],
+    "scheme": "light",
+    "colors": { "ground": "#f6f1e7", "ink": "#1d2a6b", "accent": "#ff48b0", "accent2": "#0078bf", "shapes": ["#ff48b0", "#0078bf", "#ffe800"] },
+    "typography": { "display": "Bricolage Grotesque", "body": "Figtree", "case": "lower", "weight": "black", "width": "normal" },
+    "generator": "doodle",
+    "motifs": ["star", "squiggle", "sparkle"],
+    "texture": "dots",
+    "corners": "round",
+    "ground": "flat",
+    "layout": "bloques",
+    "devices": { "pills": true, "halftone": true }
+  }
+}

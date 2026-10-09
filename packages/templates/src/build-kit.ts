@@ -1,7 +1,7 @@
 import { dateLabel } from "./i18n.js";
 import type { EventInfo, EventKit, ReferenceStyle, StyleId } from "./kit.js";
 import { DEFAULT_SEEDS, derivePalette, paletteFromReference } from "./palette.js";
-import { STYLES, styleFromReference } from "./styles.js";
+import { byVariant, STYLES, styleFromReference } from "./styles.js";
 
 export type KitInput = {
   event: Omit<EventInfo, "dateLabel" | "hashtag"> & { hashtag?: string };
@@ -27,6 +27,8 @@ export function buildKit({ event, styleId, seeds, seed = 1, keyVisual, reference
   const style = fromReference ? styleFromReference(reference) : STYLES[styleId];
   // Flock usa siempre los colores institucionales
   const effectiveSeeds = style.customColors && seeds ? seeds : DEFAULT_SEEDS[styleId];
+  // La variante rota la composición y la combinación de fuentes del estilo (la referencia mantiene sus fuentes)
+  const pair = byVariant(style.fontPairs, seed);
   return {
     event: {
       ...event,
@@ -37,7 +39,10 @@ export function buildKit({ event, styleId, seeds, seed = 1, keyVisual, reference
       id: styleId,
       seed,
       palette: fromReference ? paletteFromReference(reference) : derivePalette(styleId, effectiveSeeds),
-      fonts: style.fonts,
+      fonts: { display: pair.display, body: pair.body },
+      layout: byVariant(style.layouts, seed),
+      devices: style.devices,
+      display: pair.treatment,
       reference: fromReference ? reference : undefined,
       keyVisual,
     },

@@ -59,7 +59,8 @@ export function derivePalette(style: StyleId, seeds: { accent: string; accent2?:
       break;
     }
     case "grilla": {
-      const ground = hex(0.975, 0.008, a.h);
+      // papel casi neutro: con acentos cálidos, un tinte más fuerte se lee como crema genérico
+      const ground = hex(0.985, 0.003, a.h);
       p = {
         scheme: "light",
         ground,

@@ -32,3 +32,13 @@ export const FIT_TEXT_SCRIPT = `
 export function FitScript() {
   return <script dangerouslySetInnerHTML={{ __html: FIT_TEXT_SCRIPT }} />;
 }
+
+/** Forma con trama de puntos (semitono), para acompañar al visual o a un bloque. */
+export function Halftone({ x, y, size, color, round = true }: { x: number; y: number; size: number; color: string; round?: boolean }) {
+  return (
+    <div
+      className="halftone"
+      style={{ position: "absolute", left: x, top: y, width: size, height: size, borderRadius: round ? "50%" : 0, "--ht": color, pointerEvents: "none" }}
+    />
+  );
+}

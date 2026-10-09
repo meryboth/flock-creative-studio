@@ -26,7 +26,7 @@ const STATUS_LABEL: Record<string, { label: string; className: string }> = {
   proposed: { label: "sin aplicar", className: "bg-surface" },
 };
 
-const SUGGESTIONS = ["Hacé el título más grande", "Probá con fondo negro", "Sacá el hashtag de las credenciales", "Otra variante del visual"];
+const SUGGESTIONS = ["Hacé el título más grande", "Probá con bloques de color", "Que el nombre del evento sea gigante", "Sacá el hashtag de las credenciales"];
 
 export function Studio({ eventId, groups, history, running }: { eventId: string; groups: StudioGroup[]; history: StudioHistoryItem[]; running: boolean }) {
   const router = useRouter();

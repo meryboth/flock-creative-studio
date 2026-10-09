@@ -1,5 +1,5 @@
 import { HumanMessage } from "@langchain/core/messages";
-import type { ReferenceStyle } from "@flock/templates";
+import { BODY_FONTS, DISPLAY_FONTS, fontMeta, LAYOUTS, type ReferenceStyle } from "@flock/templates";
 import sharp from "sharp";
 import { z } from "zod";
 import { converter } from "culori";
@@ -10,22 +10,9 @@ const toOklch = converter("oklch");
 
 const HEX = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
-// Catálogo cerrado: el modelo elige, no inventa
-const DISPLAY_FONTS = [
-  "Unbounded",
-  "Archivo",
-  "Bricolage Grotesque",
-  "Gloock",
-  "Pixelify Sans",
-  "Silkscreen",
-  "Caveat",
-  "Bebas Neue",
-  "Instrument Serif",
-  "JetBrains Mono",
-] as const;
-const BODY_FONTS = ["Manrope", "Figtree", "Archivo", "JetBrains Mono"] as const;
+// Catálogo cerrado: el modelo elige, no inventa (las fichas de las fuentes salen de @flock/templates)
 const MOTIFS = ["flower", "cloud", "heart", "star", "sparkle", "squiggle"] as const;
-const MEDIUMS = ["3d-render", "pixel-art", "flat-vector", "hand-drawn", "photo", "abstract-gradient"] as const;
+const MEDIUMS = ["3d-render", "pixel-art", "flat-vector", "hand-drawn", "line-art-halftone", "risograph", "collage", "photo", "abstract-gradient"] as const;
 
 const ReferenceSchema = z.object({
   description: z.string().describe("Qué se ve en la referencia y qué la hace reconocible, en 1 o 2 oraciones en español"),
@@ -39,8 +26,8 @@ const ReferenceSchema = z.object({
     shapes: z.array(HEX).min(2).max(4).describe("Colores para las formas o el visual"),
   }),
   typography: z.object({
-    display: z.enum(DISPLAY_FONTS),
-    body: z.enum(BODY_FONTS),
+    display: z.enum(DISPLAY_FONTS as [string, ...string[]]),
+    body: z.enum(BODY_FONTS as [string, ...string[]]),
     case: z.enum(["upper", "title", "lower"]),
     weight: z.enum(["regular", "bold", "black"]),
     width: z.enum(["condensed", "normal", "extended"]),
@@ -51,6 +38,11 @@ const ReferenceSchema = z.object({
   corners: z.enum(["sharp", "soft", "round"]),
   ground: z.enum(["flat", "gradient"]),
   medium: z.enum(MEDIUMS).describe("Técnica visual dominante de la referencia"),
+  layout: z.enum(LAYOUTS as [string, ...string[]]).describe("Composición que mejor reproduce la referencia"),
+  devices: z.object({
+    pills: z.boolean().describe("true si usa etiquetas o píldoras de color rellenas"),
+    halftone: z.boolean().describe("true si usa tramas de puntos (semitono) en formas o ilustraciones"),
+  }),
   elements: z
     .array(z.string())
     .min(3)
@@ -78,18 +70,16 @@ const PROMPT = (swatches: string[], background: string) => `Sos director de arte
 
 Analizala y traducí su estilo a nuestro sistema, eligiendo SOLO entre estas opciones:
 
-Tipografía display (títulos), elegí la que mejor reproduzca la letra de la referencia:
-- "Unbounded": geométrica muy ancha y redonda, tecnológica, impacto.
-- "Archivo": grotesca neutra con eje de ancho (condensada, normal o extendida), editorial, suiza.
-- "Bricolage Grotesque": grotesca con carácter y algo de irregularidad, cercana, contemporánea.
-- "Gloock": serif display de alto contraste, elegante, editorial, cálida.
-- "Instrument Serif": serif editorial fina y condensada, moderna.
-- "Pixelify Sans": pixel / 8-bit redondeada, videojuego, retro digital.
-- "Silkscreen": pixel / bitmap muy marcada, ancha, en mayúsculas, retro computadora.
-- "Bebas Neue": condensada de afiche, alta y en mayúsculas.
-- "Caveat": manuscrita, informal, notas a mano.
-- "JetBrains Mono": monoespaciada, código, terminal.
-Tipografía de texto: "Manrope" (neutra técnica), "Figtree" (amable), "Archivo" (neutra) o "JetBrains Mono" (código, retro digital).
+Tipografía display (títulos): elegí por CARÁCTER la que mejor reproduzca la letra de la referencia (fijate si es extendida, condensada, serif, redonda, negra…):
+${DISPLAY_FONTS.map((f) => `- "${f}": ${fontMeta(f)!.character}.`).join("\n")}
+Tipografía de texto: ${BODY_FONTS.map((f) => `"${f}" (${fontMeta(f)!.character})`).join(", ")}.
+Caja: si los títulos de la referencia están en minúscula, elegí "lower"; no los pases a mayúsculas.
+
+Composición (layout), lo más importante para que las piezas se parezcan a la referencia:
+- "tipografico": la tipografía es la imagen; palabras o números gigantes que ocupan el ancho, objetos superpuestos a las letras, contraste de escala fuerte.
+- "bloques": planos de color grandes (paneles, tarjetas, esquinas redondeadas) que organizan la pieza; el texto vive dentro de los bloques.
+- "clasico": composición tranquila; logo arriba, título abajo y un visual en la esquina sobre fondo oscuro con brillo.
+Recursos gráficos (devices): indicá si usa píldoras o etiquetas rellenas y si usa tramas de puntos (semitono).
 
 Visual de las piezas (generator):
 - "orbs": esferas de luz desenfocadas, brillo, profundidad (estéticas oscuras, glow, 3D iridiscente, gradientes).
@@ -123,7 +113,8 @@ export async function analyzeReference(files: string[]): Promise<ReferenceAnalys
   try {
     // Temperatura baja: la misma referencia tiene que dar (casi) la misma lectura
     const { out, model } = await invokeStructured("vision", ReferenceSchema, [message], { name: "reference_style", temperature: 0.15, timeoutMs: 60_000 });
-    const { keyVisualPrompt, medium, elements, ...style } = out;
+    const { keyVisualPrompt, medium, elements, ...rest } = out;
+    const style = rest as ReferenceStyle;
     // Un texto muy oscuro y casi sin color es negro en la referencia (el extractor lo confunde con sombras)
     const ink = toOklch(style.colors.ink);
     if (ink && ink.l < 0.42 && (ink.c ?? 0) < 0.07) style.colors.ink = "#111111";

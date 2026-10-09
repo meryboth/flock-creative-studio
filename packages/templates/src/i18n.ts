@@ -11,6 +11,7 @@ const STRINGS = {
     where: "Dónde",
     seeAgenda: "Ver cronograma",
     hoursSuffix: "HS",
+    until: "hasta",
   },
   en: {
     agenda: "Agenda",
@@ -22,6 +23,7 @@ const STRINGS = {
     where: "Where",
     seeAgenda: "See the agenda",
     hoursSuffix: "",
+    until: "until",
   },
 } satisfies Record<Language, unknown>;
 

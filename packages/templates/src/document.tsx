@@ -1,13 +1,24 @@
 /** @jsxRuntime automatic @jsxImportSource @flock/templates */
 import type { Html } from "./jsx-runtime.js";
 import type { RenderContext } from "./kit.js";
+import { fontMeta } from "./fonts.js";
+import { contrast } from "./palette.js";
 import { resolveStyle } from "./styles.js";
+
+/** Negro o blanco, el que mejor se lea sobre un color (texto dentro de bloques de acento). */
+const onColor = (bg: string) => (contrast(bg, "#111111") >= contrast(bg, "#ffffff") ? "#111111" : "#ffffff");
 
 // CSS común a todas las piezas: paleta y tratamiento del estilo como variables + componentes base
 export function baseCss({ kit, assets, options }: RenderContext) {
   const p = kit.style.palette;
   const base = resolveStyle(kit);
-  const s = { ...base, display: { ...base.display, ...kit.style.displayOverride } };
+  const s = { ...base, display: { ...base.display, ...kit.style.display, ...kit.style.displayOverride } };
+  const devices = kit.style.devices ?? base.devices;
+  // Fuentes que dibujan mal números o "#": horarios, fechas y hashtag van con la fuente de texto
+  const weakNumerals = fontMeta(kit.style.fonts.display)?.weakNumerals
+    ? `.canvas .hashtag, .canvas .slot b, .canvas .time, .canvas .num { font-family: var(--font-body); font-weight: 800; letter-spacing: -0.02em; }
+.canvas .slot .sep { font-family: var(--font-body); font-weight: 300; }`
+    : "";
   // Excepción de diseño acotada al estilo cuyo concepto es justamente el brillo (referencia: piezas del AI Day 2026)
   const waivers =
     s.generator === "orbs" ? "/* impeccable-disable radial-halo -- generador de esferas de luz: el brillo es el concepto del estilo */\n" : "";
@@ -33,6 +44,9 @@ ${assets.fontCss}
   --pill-radius: ${s.pillRadius};
   --stroke: ${s.stroke}px;
   --title-scale: ${options?.titleScale ?? 1};
+  --on-accent: ${onColor(p.accent)};
+  --on-accent2: ${onColor(p.accent2)};
+  --block-radius: ${Math.round(s.radius * 2.6)}px;
   color-scheme: ${p.scheme};
 }
 ${(options?.hide ?? []).map((el) => `.${el === "visual" ? "visual-layer" : el} { display: none !important; }`).join("\n")}
@@ -47,6 +61,14 @@ html, body { background: var(--ground-paint); background-color: var(--ground); c
 .pill { display: inline-flex; align-items: center; border: var(--stroke) solid var(--line);
   border-radius: var(--pill-radius); font-weight: 600; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
 .outline-box { border: var(--stroke) solid var(--line); border-radius: var(--radius); }
+${
+  devices.pills
+    ? ".pill { background: var(--accent2); color: var(--on-accent2); border-color: var(--accent2); }"
+    : ""
+}
+/* Semitono: trama de puntos para formas y bloques */
+.halftone { background-image: radial-gradient(circle, var(--ht, var(--ink)) 32%, transparent 36%); background-size: 16px 16px; }
+${weakNumerals}
 .muted { color: var(--muted); }
 ${s.css ?? ""}
 `;

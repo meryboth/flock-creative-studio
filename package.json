@@ -12,7 +12,8 @@
     "db:seed": "pnpm --filter @flock/db seed",
     "db:studio": "pnpm --filter @flock/db studio",
     "bootstrap": "pnpm db:up && pnpm db:migrate && pnpm db:seed && pnpm --filter @flock/templates build",
-    "render:event": "pnpm --filter @flock/templates build && tsx tools/render-event.ts"
+    "render:event": "pnpm --filter @flock/templates build && tsx tools/render-event.ts",
+    "diversity": "pnpm --filter @flock/templates build && tsx --env-file=.env tools/diversity-sheet.ts"
   },
   "devDependencies": {
     "tsx": "^4.23.15"

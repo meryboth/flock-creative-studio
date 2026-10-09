@@ -14,6 +14,24 @@ export type Motif = "flower" | "cloud" | "heart" | "star" | "sparkle" | "squiggl
 export type Texture = "none" | "grid" | "dots" | "lines";
 
 /**
+ * Composición de las piezas (posteo, cronograma). Es lo que más define cómo se ve una familia:
+ *  - "clasico": logo arriba, título abajo, visual en la esquina, caja "hora | título" (el esquema del AI Day)
+ *  - "tipografico": la tipografía es la imagen; nombre o número gigante de borde a borde, el visual se le superpone
+ *  - "bloques": planos de color grandes con esquinas redondeadas; el texto vive dentro de los bloques
+ */
+export type Layout = "clasico" | "tipografico" | "bloques";
+export const LAYOUTS: Layout[] = ["clasico", "tipografico", "bloques"];
+
+/** Recursos gráficos que acompañan a la composición. */
+export type Devices = {
+  pills: boolean; // fecha, hashtag y etiquetas en píldoras de color (si no, píldoras de contorno)
+  halftone: boolean; // tramas de puntos (semitono) en formas y bloques
+};
+
+/** Tratamiento tipográfico de los títulos (lo define el estilo; una combinación de fuentes puede ajustarlo). */
+export type DisplayTreatment = { weight: number; transform: "uppercase" | "lowercase" | "none"; tracking: string; stretch: string; leading: number };
+
+/**
  * Estilo derivado de una imagen de referencia (lectura con IA + colores extraídos por código).
  * Combina piezas del catálogo: no inventa fuentes ni visuales, elige y ajusta.
  */
@@ -34,6 +52,8 @@ export type ReferenceStyle = {
   texture?: Texture;
   corners: "sharp" | "soft" | "round";
   ground: "flat" | "gradient";
+  layout?: Layout;
+  devices?: Devices;
 };
 
 export type Palette = {
@@ -66,6 +86,10 @@ export type EventKit = {
     seed: number;
     palette: Palette;
     fonts: { display: string; body: string };
+    layout: Layout;
+    devices: Devices;
+    // Ajustes de la combinación de fuentes elegida sobre el tratamiento del estilo
+    display?: Partial<DisplayTreatment>;
     // Solo en el estilo "referencia": cómo se armó a partir de la imagen
     reference?: ReferenceStyle;
     // Imagen propia opcional:
@@ -108,6 +132,7 @@ export type HideableElement = "hashtag" | "tagline" | "date" | "visual";
 
 /** Ajustes de una pieza pedidos en el editor conversacional. */
 export type PieceOptions = {
+  layout?: Layout; // composición pedida en el editor (pisa la del kit)
   titleScale?: number; // 1 = tamaño de la plantilla
   visualScale?: number; // 1 = tamaño de la plantilla
   hide?: HideableElement[];

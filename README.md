@@ -48,6 +48,7 @@ El proveedor principal es **Gemini Image** (requiere facturación activa en el p
 
 | Script | Qué hace |
 |---|---|
+| `pnpm diversity --label X --ref nombre=ruta [--critic]` | Hoja de contactos para medir la diversidad de lo que se genera (ver docs/informes/14) |
 | `pnpm db:up` / `db:down` | Levanta / baja Postgres + pgvector en OrbStack (puerto **5433**) |
 | `pnpm db:generate` | Genera una migración a partir de `packages/db/src/schema.ts` |
 | `pnpm db:migrate` | Aplica las migraciones |
