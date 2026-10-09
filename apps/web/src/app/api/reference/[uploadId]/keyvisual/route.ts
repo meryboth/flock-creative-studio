@@ -5,7 +5,7 @@ import { clearProgress, getProgress, setProgress } from "@/lib/progress";
 import { keyVisualPath, keyVisualUrl, readReference, referenceImages } from "@/lib/reference";
 
 // Genera un key visual original inspirado en la referencia (modelo de imagen)
-export async function POST(_req: Request, ctx: RouteContext<"/api/reference/[uploadId]/keyvisual">) {
+export async function POST(req: Request, ctx: RouteContext<"/api/reference/[uploadId]/keyvisual">) {
   const { uploadId } = await ctx.params;
   let reference;
   try {
@@ -24,6 +24,10 @@ export async function POST(_req: Request, ctx: RouteContext<"/api/reference/[upl
     outFile: keyVisualPath(uploadId),
     repoRoot: REPO_ROOT,
     medium: reference.medium,
+    // ?provider=gemini|comfyui fuerza un proveedor; sin parámetro, el orden configurado
+    providers: ["gemini", "comfyui"].includes(new URL(req.url).searchParams.get("provider") ?? "")
+      ? [new URL(req.url).searchParams.get("provider")!]
+      : undefined,
     onProgress: (p) => setProgress(`keyvisual:${uploadId}`, p),
   });
   clearProgress(`keyvisual:${uploadId}`);

@@ -28,7 +28,7 @@ Una fila por decisión de arquitectura o de producto. Estado: ✅ vigente · �
 | D22 | 2026-10-09 | Key visual con IA detrás de un proveedor intercambiable (Gemini Image hoy, ComfyUI local como alternativa) | depender de un solo proveedor | la key gratuita no tiene cuota de imágenes; no frenar por eso | ✅ ComfyUI funcionando (ver D25) |
 | D23 | 2026-10-09 | `gemini-3.5-flash` primero en las cadenas de texto y visión | 3.7/3.8-flash | ~5–12 s contra ~100 s | ✅ |
 | D24 | 2026-10-09 | La app pasa a llamarse Flock Creative Studio, con lenguaje visual de cuaderno de estudio | mantener el tema oscuro genérico | referencia elegida por la usuaria; identidad propia de herramienta creativa | ✅ |
-| D25 | 2026-10-09 | ComfyUI local con SDXL base 1.0 como primer proveedor de key visuals | Gemini Image con facturación; Flux | gratis, local, licencia comercial; entra en 18 GB | ✅ |
+| D25 | 2026-10-09 | ComfyUI local con SDXL base 1.0 como primer proveedor de key visuals | Gemini Image con facturación; Flux | gratis, local, licencia comercial; entra en 18 GB | 🔁 reemplazada por D33 (queda como respaldo) |
 | D26 | 2026-10-09 | Recortar siempre el visual generado y apoyarlo sobre el fondo real del estilo | confiar en el fondo que pinta el modelo | SDXL no respeta colores ni "fondo liso" | ✅ |
 | D27 | 2026-10-09 | Biblioteca de estilos del equipo; los eventos guardan su copia del estilo y del key visual | referenciar el estilo de la biblioteca desde el evento | se pueden borrar estilos sin romper eventos | ✅ |
 | D28 | 2026-10-09 | Repo público sin piezas de la agencia, material interno ni nombres reales | subir todo; repo privado | decisión de la usuaria | ✅ |
@@ -36,3 +36,4 @@ Una fila por decisión de arquitectura o de producto. Estado: ✅ vigente · �
 | D30 | 2026-10-09 | Pixel art del key visual terminado por código (pixelado y paleta corta) | depender solo de SDXL; modelos o LoRAs de pixel art | resultado garantizado y sin descargas extra | ✅ |
 | D31 | 2026-10-09 | Progreso real del key visual vía WebSocket de ComfyUI, guardado en memoria y consultado por la UI | barra simulada | refleja el avance real (paso N de 28) | ✅ (con varios procesos iría a la base) |
 | D32 | 2026-10-09 | Temperatura 0,15 en la lectura de referencias | 0,4 | la misma imagen tiene que dar la misma lectura | ✅ |
+| D33 | 2026-10-09 | Gemini Image como proveedor principal de key visuals; ComfyUI como respaldo local | mantener ComfyUI primero | en la comparación con la referencia pixel: resultado mucho más limpio y fiel, recibe la referencia como imagen, ~12 s contra ~150 s; costo de centavos por imagen | ✅ |

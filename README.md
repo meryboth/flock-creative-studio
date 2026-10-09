@@ -38,7 +38,7 @@ La app y la CLI funcionan sin ellos: el evento de ejemplo se genera sin imagen p
 
 ## Generación de key visuals con ComfyUI
 
-Ver [comfy/README.md](comfy/README.md). Requiere Comfy Desktop abierto y el modelo SDXL base en `~/ComfyUI-Shared/models/checkpoints`. Si ComfyUI no está disponible, se intenta con Gemini (requiere facturación activa).
+El proveedor principal es **Gemini Image** (requiere facturación activa en el proyecto de Google Cloud). Si no está disponible, se usa **ComfyUI local** con SDXL: ver [comfy/README.md](comfy/README.md).
 
 ## Scripts
 

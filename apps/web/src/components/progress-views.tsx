@@ -50,12 +50,12 @@ export function KeyVisualProgress({ uploadId, running }: { uploadId: string; run
   const elapsed = useElapsed(running, progress?.startedAt);
   const phase = progress?.phase ?? "queued";
   const active = phase === "queued" ? 0 : phase === "generating" ? 1 : 2;
-  const local = (progress?.provider ?? "comfyui") === "comfyui";
+  const local = progress?.provider === "comfyui";
   return (
     <div className="space-y-3 bg-surface/80 p-4">
       <ProcessSteps
         steps={[
-          { label: local ? "Preparando el modelo en tu Mac" : "Enviando a Gemini" },
+          { label: local ? "Preparando el modelo en tu Mac" : "Enviando la referencia a Gemini" },
           {
             label: local ? "Generando la imagen con ComfyUI" : "Generando la imagen",
             detail: progress?.total ? `paso ${progress.step} de ${progress.total}` : undefined,
@@ -66,7 +66,11 @@ export function KeyVisualProgress({ uploadId, running }: { uploadId: string; run
         elapsed={elapsed}
         progress={phase === "generating" && progress?.total ? { value: progress.step ?? 0, max: progress.total } : null}
       />
-      <p className="text-xs text-muted">Suele tardar entre 2 y 3 minutos. Podés seguir completando el resto mientras tanto.</p>
+      <p className="text-xs text-muted">
+        {local
+          ? "Con ComfyUI en tu Mac tarda entre 2 y 3 minutos. Podés seguir completando el resto mientras tanto."
+          : "Con Gemini suele tardar unos segundos."}
+      </p>
     </div>
   );
 }

@@ -17,7 +17,8 @@ type KeyVisualOptions = {
   seed?: number;
   // Técnica de la referencia (pixel-art, 3d-render…): ajusta el prompt y el posproceso
   medium?: string;
-  // Colores del estilo: el pixel art se cuantiza a una paleta corta
+  // Proveedores a usar, en orden (por defecto: KEYVISUAL_PROVIDERS)
+  providers?: string[];
   onProgress?: (p: KeyVisualProgress) => void;
 };
 
@@ -83,7 +84,7 @@ export function colorName(hex: string) {
  * Prueba los proveedores de KEYVISUAL_PROVIDERS en orden (por defecto: ComfyUI local, después Gemini).
  */
 export async function generateKeyVisual(opts: KeyVisualOptions): Promise<KeyVisualResult> {
-  const order = (process.env.KEYVISUAL_PROVIDERS ?? "comfyui,gemini").split(",").map((p) => p.trim());
+  const order = opts.providers?.length ? opts.providers : (process.env.KEYVISUAL_PROVIDERS ?? "gemini,comfyui").split(",").map((p) => p.trim());
   const providers: Record<string, Provider> = {
     comfyui: comfyui,
     gemini: geminiImage,
