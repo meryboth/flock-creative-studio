@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { asc, desc, eq } from "drizzle-orm";
 import { db, schema } from "@flock/db";
 import { writeEventCopy } from "@flock/agents";
-import { generateFamily, loadRoster } from "@flock/studio";
+import { adjustFrom, generateFamily, loadRoster, type Overrides } from "@flock/studio";
 import { buildKit, type AgendaItem, type Attendee, type EventContent, type Language, type ReferenceStyle, type StyleId } from "@flock/templates";
 import { REPO_ROOT, STORAGE_DIR } from "./paths";
 
@@ -152,6 +152,8 @@ export async function runGeneration(eventId: string, { rewriteCopy = true } = {}
       outDir: join(STORAGE_DIR, eventId),
       keyVisualPath: style.keyVisual && existsSync(join(STORAGE_DIR, style.keyVisual)) ? join(STORAGE_DIR, style.keyVisual) : undefined,
       elementPaths: (style.elements ?? []).map((e) => join(STORAGE_DIR, e)).filter((p) => existsSync(p)),
+      // cambios pedidos en el editor conversacional
+      adjust: adjustFrom(kit, event.overrides as Overrides | null),
       onProgress: async (progress, total, label) => {
         await update({ progress, total, stage: `Generando: ${label}` });
       },

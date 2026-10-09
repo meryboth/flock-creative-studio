@@ -36,7 +36,7 @@ export const agendaSlide = {
         css: `
 .canvas > * { position: absolute; }
 .box { left: 120px; right: 120px; top: 500px; height: 220px; display: flex; align-items: center; padding: 0 76px; }
-.slot { display: block; width: 100%; white-space: nowrap; overflow: hidden; font-size: 56px; }
+.slot { display: block; width: 100%; white-space: nowrap; overflow: hidden; font-size: calc(56px * var(--title-scale)); }
 .slot b { font-weight: var(--display-weight); }
 .sep, .title { font-weight: calc(var(--display-weight) - 400); }
 .meta { left: 196px; top: 744px; font-size: 30px; color: var(--muted); }
@@ -85,7 +85,7 @@ export const agendaSummary = {
 .canvas > * { position: absolute; }
 .head { left: 72px; right: 72px; top: 400px; }
 .date { font-size: 22px; padding: 8px 22px; }
-.head h1 { margin-top: 28px; font-size: 96px; white-space: nowrap; overflow: hidden; }
+.head h1 { margin-top: 28px; font-size: calc(96px * var(--title-scale)); white-space: nowrap; overflow: hidden; }
 .event { margin-top: 14px; font-size: 26px; }
 .rows { left: 72px; right: 72px; top: 650px; list-style: none; }
 .rows li { display: flex; align-items: baseline; gap: 28px; padding: 20px 0; border-top: 1.5px solid color-mix(in srgb, var(--line) 25%, transparent); }

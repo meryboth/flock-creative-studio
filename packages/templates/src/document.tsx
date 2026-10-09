@@ -4,9 +4,10 @@ import type { RenderContext } from "./kit.js";
 import { resolveStyle } from "./styles.js";
 
 // CSS común a todas las piezas: paleta y tratamiento del estilo como variables + componentes base
-export function baseCss({ kit, assets }: RenderContext) {
+export function baseCss({ kit, assets, options }: RenderContext) {
   const p = kit.style.palette;
-  const s = resolveStyle(kit);
+  const base = resolveStyle(kit);
+  const s = { ...base, display: { ...base.display, ...kit.style.displayOverride } };
   // Excepción de diseño acotada al estilo cuyo concepto es justamente el brillo (referencia: piezas del AI Day 2026)
   const waivers =
     s.generator === "orbs" ? "/* impeccable-disable radial-halo -- generador de esferas de luz: el brillo es el concepto del estilo */\n" : "";
@@ -31,8 +32,10 @@ ${assets.fontCss}
   --radius: ${s.radius}px;
   --pill-radius: ${s.pillRadius};
   --stroke: ${s.stroke}px;
+  --title-scale: ${options?.titleScale ?? 1};
   color-scheme: ${p.scheme};
 }
+${(options?.hide ?? []).map((el) => `.${el === "visual" ? "visual-layer" : el} { display: none !important; }`).join("\n")}
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { background: var(--ground-paint); background-color: var(--ground); color: var(--ink);
   font-family: var(--font-body); -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }

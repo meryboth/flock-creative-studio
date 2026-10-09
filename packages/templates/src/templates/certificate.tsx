@@ -40,10 +40,10 @@ export const certificate = {
 .canvas > * { position: absolute; }
 .body { left: 122px; width: 1240px; top: 300px; }
 .date { font-size: 24px; padding: 8px 26px; }
-h1 { margin-top: 36px; font-size: 120px; }
+h1 { margin-top: 36px; font-size: calc(120px * var(--title-scale)); }
 h1 .sub { display: block; margin-top: 10px; font-size: 40px; opacity: .9; }
 .given { margin-top: 64px; font-size: 26px; }
-.name { width: 1240px; margin-top: 10px; font-size: 92px; white-space: nowrap; overflow: hidden; }
+.name { width: 1240px; margin-top: 10px; font-size: calc(92px * var(--title-scale)); white-space: nowrap; overflow: hidden; }
 .desc { margin-top: 22px; max-width: 900px; font-size: 26px; line-height: 1.5; }
 .hashtag { left: 122px; bottom: 80px; font-size: 30px; }
 .tagline { right: 126px; bottom: 86px; font-size: 18px; }

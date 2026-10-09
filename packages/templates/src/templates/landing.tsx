@@ -98,7 +98,7 @@ nav .logo { width: 140px; }
 nav .tag { font-size: 14px; }
 .hero-copy { position: relative; margin-top: auto; max-width: 720px; }
 .date { font-size: 15px; padding: 6px 18px; }
-.hero h1 { margin-top: 24px; font-size: clamp(48px, 8.5vw, 96px); text-wrap: balance; }
+.hero h1 { margin-top: 24px; font-size: calc(clamp(48px, 8.5vw, 96px) * var(--title-scale)); text-wrap: balance; }
 .lead { margin-top: 24px; font-size: clamp(17px, 2vw, 21px); max-width: 34em; }
 .cta { display: inline-block; margin-top: 32px; padding: 16px 30px; border-radius: var(--pill-radius); background: var(--ink);
   color: var(--ground); font-weight: 700; font-size: 15px; text-decoration: none; transition: transform .2s cubic-bezier(.2,.8,.2,1); }

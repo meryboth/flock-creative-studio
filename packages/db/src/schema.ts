@@ -66,6 +66,8 @@ export const events = pgTable("events", {
   contentSource: text("content_source"), // gemini | fallback
   // De dónde salió la nómina de este evento y cuándo se leyó: { source, fetchedAt }
   roster: jsonb("roster"),
+  // Cambios pedidos en el editor conversacional (Overrides de @flock/studio)
+  overrides: jsonb("overrides"),
   status: eventStatus("status").notNull().default("exploring"),
   brandKitId: uuid("brand_kit_id").references(() => brandKits.id),
   createdAt: createdAt(),
@@ -210,6 +212,30 @@ export const feedback = pgTable("feedback", {
   comment: text("comment").notNull(),
   createdAt: createdAt(),
 });
+
+// ─── Editor conversacional ──────────────────────────────────────────────────
+
+export const changeSetStatus = pgEnum("change_set_status", ["proposed", "applied", "discarded", "reverted", "failed"]);
+
+/** Cada pedido del chat: el mensaje, la propuesta de la IA y qué se hizo con ella. */
+export const changeSets = pgTable(
+  "change_sets",
+  {
+    id: id(),
+    eventId: uuid("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
+    message: text("message").notNull(),
+    pieceFile: text("piece_file"), // pieza elegida al pedir el cambio
+    reply: text("reply"),
+    operations: jsonb("operations").notNull().default([]),
+    suggestedScope: text("suggested_scope"),
+    scope: jsonb("scope"), // alcance elegido al aplicar
+    status: changeSetStatus("status").notNull().default("proposed"),
+    // Foto previa (overrides, textos, estilo) para poder deshacer
+    before: jsonb("before"),
+    createdAt: createdAt(),
+  },
+  (t) => [index().on(t.eventId)],
+);
 
 // ─── Trazabilidad de workflows ──────────────────────────────────────────────
 

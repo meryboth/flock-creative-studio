@@ -42,8 +42,8 @@ export const badge = {
 .canvas > * { position: absolute; }
 .who { left: 52px; right: 52px; top: 420px; }
 .first, .last { white-space: nowrap; overflow: hidden; }
-.first { font-size: 74px; }
-.last { font-size: 46px; margin-top: 8px; opacity: .92; }
+.first { font-size: calc(74px * var(--title-scale)); }
+.last { font-size: calc(46px * var(--title-scale)); margin-top: 8px; opacity: .92; }
 .role { margin-top: 28px; font-size: 26px; }
 .area { margin-top: 18px; font-size: 18px; padding: 8px 20px; }
 footer { left: 52px; right: 52px; bottom: 52px; padding-top: 22px; border-top: 2px solid color-mix(in srgb, var(--line) 30%, transparent); }

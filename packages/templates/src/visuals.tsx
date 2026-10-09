@@ -338,7 +338,10 @@ const GENERATORS: Record<Generator, (p: VisualProps) => Html | null> = {
 };
 
 /** Capa visual de la pieza según el estilo del kit. `salt` varía la composición entre piezas. */
-export function Backdrop(props: VisualProps) {
+export function Backdrop(raw: VisualProps) {
+  // Escala pedida en el editor: la zona crece o se achica manteniendo fija la esquina superior derecha
+  const k = raw.ctx.options?.visualScale ?? 1;
+  const props = k === 1 ? raw : { ...raw, area: { x: raw.area.x + raw.area.w * (1 - k), y: raw.area.y, w: raw.area.w * k, h: raw.area.h * k } };
   const Generator = GENERATORS[resolveStyle(props.ctx.kit).generator];
   // Con un key visual propio, el generador no compite con él: solo queda el brillo de las esferas detrás de un objeto
   const fit = props.ctx.kit.style.keyVisual?.fit;
@@ -350,9 +353,9 @@ export function Backdrop(props: VisualProps) {
   const objectKv = fit === "object" && Boolean(props.ctx.assets.keyVisual);
   const useElements = elements && (!objectKv || rng(props.ctx.kit.style.seed, props.salt)() < 0.5);
   return (
-    <>
+    <div className="visual-layer" style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
       {drawGenerator && !useElements && <Generator {...props} />}
       {useElements ? <Elements {...props} /> : <KeyVisualImage {...props} />}
-    </>
+    </div>
   );
 }

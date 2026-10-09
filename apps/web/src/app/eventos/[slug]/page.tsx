@@ -3,7 +3,11 @@ import Link from "next/link";
 import { STYLES } from "@flock/templates";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { GenerationProgress } from "@/components/progress-views";
+import { Studio, type StudioGroup, type StudioHistoryItem } from "@/components/studio";
+import { describeOperation, listChanges } from "@/lib/editor";
 import { listPieces, readText, storageUrl } from "@/lib/pieces";
+import type { EditOperation } from "@flock/agents";
+import type { schema } from "@flock/db";
 import { getEvent, type StyleChoice } from "@/lib/studio";
 import { newVariantAction, rewriteCopyAction } from "./actions";
 
@@ -39,7 +43,7 @@ async function EventContent({ params }: { params: PageProps<"/eventos/[slug]">["
     );
   }
 
-  const { event, run } = data;
+  const { event, run, pieces } = data;
   const style = event.style as StyleChoice | null;
   // El evento pasa a "producing" antes de que arranque la generación en segundo plano
   const running = run?.status === "running" || run?.status === "queued" || event.status === "producing";
@@ -98,9 +102,58 @@ async function EventContent({ params }: { params: PageProps<"/eventos/[slug]">["
         </p>
       )}
 
-      {!running && <Gallery folder={event.id} />}
+      <StudioSection eventId={event.id} pieces={pieces} running={running} />
     </>
   );
+}
+
+const GROUP_TITLES: { id: string; title: string }[] = [
+  { id: "linkedin", title: "LinkedIn" },
+  { id: "cronograma", title: "Cronograma" },
+  { id: "credenciales", title: "Credenciales" },
+  { id: "certificados", title: "Certificados" },
+  { id: "landing", title: "Landing" },
+];
+
+type PieceRow = typeof schema.pieces.$inferSelect;
+
+/** Galería seleccionable + chat de edición. */
+async function StudioSection({ eventId, pieces, running }: { eventId: string; pieces: PieceRow[]; running: boolean }) {
+  if (!pieces.length) return running ? null : <p className="text-muted">Todavía no hay piezas.</p>;
+  // Versión de las piezas: cambia cuando termina una regeneración (rompe la caché del navegador)
+  const v = Math.max(...pieces.map((p) => p.createdAt.getTime()));
+  const label = new Map(pieces.map((p) => [p.file, (p.data as { label?: string }).label ?? p.file!]));
+  const groups: StudioGroup[] = await Promise.all(
+    GROUP_TITLES.map(async (g) => ({
+      ...g,
+      pieces: await Promise.all(
+        pieces
+          .filter((p) => p.file?.startsWith(`${g.id}/`))
+          .map(async (p) => {
+            const file = p.file!;
+            const url = `${storageUrl(`${eventId}/${file}`)}?v=${v}`;
+            const kind = (file.split(".").pop() as "png" | "txt" | "html" | "pdf") ?? "png";
+            return {
+              file,
+              url,
+              kind,
+              label: label.get(file) ?? file,
+              text: kind === "txt" ? await readText(`${eventId}/${file}`).catch(() => "") : undefined,
+              previewUrl: kind === "html" ? url.replace("index.html", "preview-desktop.png") : undefined,
+            };
+          }),
+      ),
+    })),
+  );
+  const history: StudioHistoryItem[] = (await listChanges(eventId)).map((c) => ({
+    id: c.id,
+    message: c.message,
+    reply: c.reply,
+    operations: ((c.operations as EditOperation[] | null) ?? []).map(describeOperation),
+    status: c.status,
+    pieceLabel: c.pieceFile ? label.get(c.pieceFile) : undefined,
+  }));
+  return <Studio eventId={eventId} groups={groups.filter((g) => g.pieces.length)} history={history} running={running} />;
 }
 
 async function Gallery({ folder }: { folder: string }) {

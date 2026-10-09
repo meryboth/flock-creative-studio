@@ -73,6 +73,8 @@ export type EventKit = {
     //  - "blend": visual completo (imagen con fondo) que se funde con el fondo de la pieza
     //  - "object": objeto recortado (fondo transparente, ej. generado con IA), centrado en la zona del visual
     keyVisual?: { file: string; fit?: "top" | "blend" | "object" };
+    // Ajustes del tratamiento de títulos pedidos en el editor (pisan los del estilo)
+    displayOverride?: { transform?: "uppercase" | "lowercase" | "none"; weight?: number };
   };
   logo: { onDark: string; onLight: string };
 };
@@ -101,7 +103,17 @@ export type ResolvedAssets = {
   fontCss: string;
 };
 
-export type RenderContext = { kit: EventKit; assets: ResolvedAssets };
+/** Elementos que el editor puede ocultar (el logo no: regla de marca). */
+export type HideableElement = "hashtag" | "tagline" | "date" | "visual";
+
+/** Ajustes de una pieza pedidos en el editor conversacional. */
+export type PieceOptions = {
+  titleScale?: number; // 1 = tamaño de la plantilla
+  visualScale?: number; // 1 = tamaño de la plantilla
+  hide?: HideableElement[];
+};
+
+export type RenderContext = { kit: EventKit; assets: ResolvedAssets; options?: PieceOptions };
 
 export type LinkedInPost = { id: string; headline: string; body?: string; post: string };
 

@@ -49,13 +49,13 @@ export const linkedinPost = {
 /* anclado abajo: con títulos largos el bloque crece hacia arriba, nunca sobre el hashtag */
 .square .copy { left: 80px; right: 80px; bottom: 170px; }
 .square .date { font-size: 24px; padding: 8px 24px; }
-.square .headline { margin-top: 30px; font-size: 112px; max-height: 360px; }
+.square .headline { margin-top: 30px; font-size: calc(112px * var(--title-scale)); max-height: 360px; }
 .square .body { margin-top: 26px; max-width: 760px; font-size: 30px; }
 .square .hashtag { left: 80px; bottom: 76px; font-size: 38px; }
 .square .tagline { right: 80px; bottom: 84px; font-size: 16px; max-width: 560px; text-align: right; }
 .landscape .copy { left: 60px; width: 620px; bottom: 110px; }
 .landscape .date { font-size: 18px; padding: 6px 18px; }
-.landscape .headline { margin-top: 20px; font-size: 68px; max-height: 230px; }
+.landscape .headline { margin-top: 20px; font-size: calc(68px * var(--title-scale)); max-height: 230px; }
 .landscape .body { margin-top: 16px; font-size: 22px; }
 .landscape .hashtag { left: 60px; bottom: 44px; font-size: 26px; }
 `,
