@@ -45,9 +45,14 @@ export function parsePrompt(text: string): Omit<Prompt, "render"> {
   return { id: meta.id, version: Number(meta.version), description: meta.description ?? "", body, hash: createHash("sha256").update(body).digest("hex").slice(0, 16) };
 }
 
-/** Reemplaza las {{variables}}; falla si falta alguna (mejor un error que un prompt con huecos). */
+/**
+ * Reemplaza las {{variables}} (en camelCase); falla si falta alguna (mejor un error que un prompt con huecos).
+ * Las que están en MAYÚSCULAS ({{EVENT_NAME}}) quedan tal cual: son variables de las plantillas que el
+ * modelo tiene que escribir, no del prompt.
+ */
 export function renderTemplate(body: string, vars: Record<string, string | number>, id = "prompt") {
-  return body.replace(/\{\{(\w+)\}\}/g, (_, name: string) => {
+  return body.replace(/\{\{(\w+)\}\}/g, (literal, name: string) => {
+    if (/^[A-Z0-9_]+$/.test(name)) return literal;
     if (!(name in vars)) throw new Error(`Al prompt "${id}" le falta la variable {{${name}}}`);
     return String(vars[name]);
   });

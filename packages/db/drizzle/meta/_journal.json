@@ -85,6 +85,13 @@
       "when": 1791573278940,
       "tag": "0011_quick_jamie_braddock",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791575368481,
+      "tag": "0012_rich_santa_claus",
+      "breakpoints": true
     }
   ]
 }

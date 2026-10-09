@@ -2,7 +2,7 @@ import "server-only";
 import { existsSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { ReferenceStyle } from "@flock/templates";
+import type { DesignedPieceId, DesignedTemplate, ReferenceStyle } from "@flock/templates";
 import { UPLOADS_DIR } from "./paths";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -36,4 +36,22 @@ export async function uploadElements(uploadId: string) {
   const dir = elementsDir(uploadId);
   if (!existsSync(dir)) return [];
   return (await readdir(dir)).filter((f) => f.endsWith(".png")).sort().map((f) => `uploads/${uploadId}/elements/${f}`);
+}
+
+// ─── Plantillas diseñadas por IA para una subida ───────────────────────────
+
+export type DesignedSet = Partial<Record<DesignedPieceId, DesignedTemplate>>;
+
+export const templatesDir = (uploadId: string) => join(uploadDir(uploadId), "templates");
+
+export async function readTemplates(uploadId: string): Promise<DesignedSet | null> {
+  const file = join(templatesDir(uploadId), "templates.json");
+  return existsSync(file) ? JSON.parse(await readFile(file, "utf8")) : null;
+}
+
+/** Miniaturas de las plantillas diseñadas (rutas relativas a storage/). */
+export async function templatePreviews(uploadId: string) {
+  const dir = templatesDir(uploadId);
+  if (!existsSync(dir)) return [];
+  return (await readdir(dir)).filter((f) => f.endsWith(".png")).sort().map((f) => `uploads/${uploadId}/templates/${f}`);
 }

@@ -24,5 +24,7 @@ describe("prompts versionados", () => {
   it("una variable faltante es un error, no un hueco en el prompt", () => {
     expect(() => renderTemplate("Hola {{nombre}}", {}, "test")).toThrow(/nombre/);
     expect(renderTemplate("Hola {{nombre}}", { nombre: "Flock" })).toBe("Hola Flock");
+    // las variables de plantilla (en mayúsculas) quedan para el modelo
+    expect(renderTemplate("{{EVENT_NAME}} · {{x}}", { x: 1 })).toBe("{{EVENT_NAME}} · 1");
   });
 });

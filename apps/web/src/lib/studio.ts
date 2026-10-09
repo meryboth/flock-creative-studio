@@ -6,7 +6,7 @@ import { asc, desc, eq } from "drizzle-orm";
 import { db, schema } from "@flock/db";
 import { writeEventCopy } from "@flock/agents";
 import { adjustFrom, generateFamily, loadRoster, manualMinutes, outputsOf, type OutputId, type Overrides, type RosterSource } from "@flock/studio";
-import { buildKit, type AgendaItem, type Attendee, type EventContent, type Language, type ReferenceStyle, type StyleId } from "@flock/templates";
+import { buildKit, type DesignedPieceId, type DesignedTemplate, type AgendaItem, type Attendee, type EventContent, type Language, type ReferenceStyle, type StyleId } from "@flock/templates";
 import { REPO_ROOT, STORAGE_DIR } from "./paths";
 import { flushTelemetry, setTelemetryContext, track, withTelemetry } from "./telemetry";
 import { sql } from "drizzle-orm";
@@ -21,6 +21,8 @@ export type StyleChoice = {
   libraryStyleId?: string; // si vino de la biblioteca de estilos
   keyVisual?: string;
   elements?: string[]; // elementos decorativos generados (rutas relativas a storage/)
+  // Plantillas diseñadas por IA (copia propia del evento): reemplazan a las de código en esas piezas
+  templates?: Partial<Record<DesignedPieceId, DesignedTemplate>>;
 };
 
 export type NewEventInput = {
@@ -182,6 +184,7 @@ async function generate(eventId: string, { rewriteCopy = true }: { rewriteCopy?:
       // cambios pedidos en el editor conversacional
       adjust: adjustFrom(kit, event.overrides as Overrides | null),
       outputs: outputsOf(event.outputs),
+      designed: style.templates,
       onProgress: async (progress, total, label) => {
         await update({ progress, total, stage: `Generando: ${label}` });
       },

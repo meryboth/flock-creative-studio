@@ -10,3 +10,4 @@ export { certificate } from "./templates/certificate.js";
 export { badge, badgeSheet, BADGE_MM } from "./templates/badge.js";
 export { linkedinPost, type LinkedInFormat } from "./templates/linkedin.js";
 export { landing } from "./templates/landing.js";
+export { DESIGNED_PIECES, PIECE_SPECS, REQUIRED_CLASSES, renderDesigned, sampleData, sanitizeTemplate, validateTemplate, type DesignedData, type DesignedOverrides, type DesignedPieceId, type DesignedTemplate, type PieceSpec } from "./designed.js";

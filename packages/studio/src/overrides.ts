@@ -116,6 +116,6 @@ export function adjustFrom(kit: EventKit, o: Overrides | null | undefined) {
   if (!o) return undefined;
   return ({ file, type }: { file: string; type: PieceType }): PieceAdjust | undefined => {
     const patch = mergePatch(mergePatch(o.all, o.groups?.[groupOf(type)]), o.pieces?.[file]);
-    return isEmpty(patch) ? undefined : applyPatch(kit, patch);
+    return isEmpty(patch) ? undefined : { ...applyPatch(kit, patch), patch };
   };
 }

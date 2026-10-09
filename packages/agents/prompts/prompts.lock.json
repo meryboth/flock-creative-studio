@@ -7,9 +7,17 @@
     "version": 1,
     "hash": "9e1aef595fcbeee1"
   },
+  "design-review": {
+    "version": 2,
+    "hash": "14ec0f4303d1552a"
+  },
+  "designer": {
+    "version": 3,
+    "hash": "190c992751188b0a"
+  },
   "editor": {
-    "version": 1,
-    "hash": "64766e21780fb9de"
+    "version": 2,
+    "hash": "57a0074534635355"
   },
   "elements": {
     "version": 1,

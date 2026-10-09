@@ -10,9 +10,11 @@
     "@flock/studio": "workspace:*",
     "@flock/templates": "workspace:*",
     "@imgly/background-removal-node": "^1.4.5",
+    "@langchain/core": "^1.2.17",
     "culori": "^4.0.2",
     "drizzle-orm": "^0.45.4",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/culori": "^4.0.1",

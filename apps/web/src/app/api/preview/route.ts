@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { STYLES, type Language, type StyleId } from "@flock/templates";
 import { existsSync } from "node:fs";
 import { previewHtml, type PreviewPiece } from "@/lib/preview";
-import { keyVisualPath, keyVisualUrl, readReference, uploadElements } from "@/lib/reference";
+import { keyVisualPath, keyVisualUrl, readReference, readTemplates, uploadElements } from "@/lib/reference";
 import { getLibraryStyle } from "@/lib/style-library";
 import { STORAGE_DIR } from "@/lib/paths";
 import { join } from "node:path";
@@ -57,6 +57,8 @@ export async function GET(req: NextRequest) {
     (q.get("piece") as PreviewPiece) ?? "linkedin",
     kvUrl ?? undefined,
     elementUrls,
+    // Plantillas diseñadas por IA: las de la biblioteca o, con ?tpl=1, las de la subida
+    library?.templates ?? (stored && ref && q.get("tpl") === "1" ? ((await readTemplates(ref)) ?? undefined) : undefined),
   );
   return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
 }

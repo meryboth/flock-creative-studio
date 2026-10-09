@@ -92,12 +92,16 @@ const FIND_ISSUES = `(() => {
   return issues;
 })()`;
 
-/** Como renderPng, pero además devuelve los textos recortados o fuera del lienzo. */
-export function renderPngChecked(html: string, size: Size, scale = 1) {
+/** Como renderPng, pero además devuelve los textos recortados o fuera del lienzo y el cuerpo de los textos medidos. */
+export function renderPngChecked(html: string, size: Size, scale = 1, measure: string[] = []) {
   return withPage(html, size, scale, async (page) => {
     const issues = (await page.evaluate(FIND_ISSUES)) as RenderIssue[];
+    // Cuerpo real (después del ajuste de texto) de los elementos pedidos, ej. ".event-name"
+    const metrics = (await page.evaluate(
+      `(${JSON.stringify(measure)}).map((sel) => { const el = document.querySelector(sel); return [sel, el ? parseFloat(getComputedStyle(el).fontSize) : null]; })`,
+    )) as [string, number | null][];
     const png = await page.screenshot({ type: "png", clip: { x: 0, y: 0, ...size } });
-    return { png, issues };
+    return { png, issues, metrics: Object.fromEntries(metrics) as Record<string, number | null> };
   });
 }
 

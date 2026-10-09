@@ -5,3 +5,5 @@ export { addPatch, adjustFrom, applyPatch, groupOf, mergePatch, GROUP_LABEL, typ
 export { refineReferenceStyle, type RefineStep } from "./refine";
 export { OUTPUTS, OUTPUT_IDS, DEFAULT_OUTPUTS, outputsOf, type OutputId } from "./outputs";
 export { baseline, manualMinutes, DEFAULT_BASELINE, type Baseline } from "./baseline";
+export { designPiece, designStyleTemplates, renderTemplatePreview, type DesignResult, type DesignStep } from "./design";
+export { detectFindings } from "./impeccable";

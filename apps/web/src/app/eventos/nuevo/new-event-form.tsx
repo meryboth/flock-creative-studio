@@ -54,6 +54,7 @@ export function NewEventForm({ styles, library, initialLibraryId }: { styles: St
   const [analyzing, setAnalyzing] = useState<number | false>(false); // cantidad de imágenes en análisis
   const fileInput = useRef<HTMLInputElement>(null);
   const [keyVisual, setKeyVisual] = useState<KeyVisualState>({ status: "idle" });
+  const [templatesVersion, setTemplatesVersion] = useState<number | null>(null);
 
   const set = (k: keyof typeof fields) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setFields((f) => ({ ...f, [k]: e.target.value }));
@@ -71,6 +72,10 @@ export function NewEventForm({ styles, library, initialLibraryId }: { styles: St
         q.set("v", String(keyVisual.version));
         if (keyVisual.keyVisualUrl) q.set("kv", "1");
         if (keyVisual.elements?.length) q.set("el", "1");
+      }
+      if (templatesVersion) {
+        q.set("tpl", "1");
+        q.set("tv", String(templatesVersion));
       }
     }
     return `/api/preview?${q}`;
@@ -233,7 +238,13 @@ export function NewEventForm({ styles, library, initialLibraryId }: { styles: St
                   )}
                 </div>
                 {moodboard.reference ? (
-                  <ReferencePanel reading={moodboard.reference} keyVisual={keyVisual} onGenerateKeyVisual={onGenerateKeyVisual} uploadId={moodboard.uploadId} />
+                  <ReferencePanel
+                    reading={moodboard.reference}
+                    keyVisual={keyVisual}
+                    onGenerateKeyVisual={onGenerateKeyVisual}
+                    uploadId={moodboard.uploadId}
+                    onTemplates={setTemplatesVersion}
+                  />
                 ) : (
                   moodboard.referenceError && <p className="text-sm text-muted">No pudimos leer el estilo con IA; usamos solo los colores. ({moodboard.referenceError})</p>
                 )}
@@ -334,6 +345,7 @@ export function NewEventForm({ styles, library, initialLibraryId }: { styles: St
         <input type="hidden" name="accent2" value={(colors[styleId] ?? current.defaults).accent2 ?? ""} />
         <input type="hidden" name="referenceUpload" value={styleId === "referencia" && moodboard ? moodboard.uploadId : ""} />
         <input type="hidden" name="keyVisual" value={styleId === "referencia" && keyVisual.status === "done" && keyVisual.keyVisualUrl ? "1" : ""} />
+        <input type="hidden" name="templates" value={styleId === "referencia" && templatesVersion ? "1" : ""} />
         <input type="hidden" name="elements" value={styleId === "referencia" && keyVisual.status === "done" && keyVisual.elements?.length ? "1" : ""} />
         <input type="hidden" name="seed" value={seed} />
         <input type="hidden" name="moodboard" value={moodboard ? JSON.stringify(moodboard) : ""} />

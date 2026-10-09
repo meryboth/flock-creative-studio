@@ -5,9 +5,9 @@ import { cp, mkdir, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@flock/db";
-import type { ReferenceStyle } from "@flock/templates";
+import type { DesignedPieceId, DesignedTemplate, ReferenceStyle } from "@flock/templates";
 import { STORAGE_DIR } from "./paths";
-import { readReference, uploadDir } from "./reference";
+import { readReference, readTemplates, templatesDir, uploadDir } from "./reference";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -19,6 +19,8 @@ export type LibraryStyle = {
   images: string[]; // rutas relativas a storage/
   keyVisual: string | null; // ruta relativa a storage/
   elements: string[]; // rutas relativas a storage/
+  templates: Partial<Record<DesignedPieceId, DesignedTemplate>> | null; // plantillas diseñadas por IA
+  templatePreviews: string[]; // miniaturas (rutas relativas a storage/)
   createdAt: Date;
 };
 
@@ -27,7 +29,11 @@ const styleDir = (id: string) => {
   return join(STORAGE_DIR, "styles", id);
 };
 
-const toLibraryStyle = (row: typeof schema.styles.$inferSelect): LibraryStyle => ({ ...row, reference: row.reference as ReferenceStyle });
+const toLibraryStyle = (row: typeof schema.styles.$inferSelect): LibraryStyle => ({
+  ...row,
+  reference: row.reference as ReferenceStyle,
+  templates: (row.templates as LibraryStyle["templates"]) ?? null,
+});
 
 export async function listLibraryStyles() {
   return (await db.select().from(schema.styles).orderBy(desc(schema.styles.createdAt))).map(toLibraryStyle);
@@ -73,6 +79,14 @@ export async function createLibraryStyle(name: string, uploadId: string) {
     for (const f of elementFiles) await cp(join(fromElements, f), join(to, "elements", f));
   }
 
+  // Plantillas diseñadas por IA (si se diseñaron) y sus miniaturas
+  const templates = await readTemplates(uploadId);
+  const previewFiles = existsSync(templatesDir(uploadId)) ? (await readdir(templatesDir(uploadId))).filter((f) => f.endsWith(".png")).sort() : [];
+  if (previewFiles.length) {
+    await mkdir(join(to, "templates"), { recursive: true });
+    for (const f of previewFiles) await cp(join(templatesDir(uploadId), f), join(to, "templates", f));
+  }
+
   const rel = (f: string) => `styles/${row.id}/${f}`;
   await db
     .update(schema.styles)
@@ -80,6 +94,8 @@ export async function createLibraryStyle(name: string, uploadId: string) {
       images: files.filter((f) => f !== "keyvisual.png").map(rel),
       keyVisual: files.includes("keyvisual.png") ? rel("keyvisual.png") : null,
       elements: elementFiles.map((f) => rel(`elements/${f}`)),
+      templates,
+      templatePreviews: previewFiles.map((f) => rel(`templates/${f}`)),
     })
     .where(eq(schema.styles.id, row.id));
   track("style.created", { props: { styleId: row.id, layout: stored.style.layout ?? null } });

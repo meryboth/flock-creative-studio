@@ -104,6 +104,9 @@ export const styles = pgTable("styles", {
   images: text("images").array().notNull().default([]),
   keyVisual: text("key_visual"),
   elements: text("elements").array().notNull().default([]), // elementos decorativos generados
+  // Plantillas diseñadas por IA (DesignedTemplate por pieza) y sus miniaturas
+  templates: jsonb("templates"),
+  templatePreviews: text("template_previews").array().notNull().default([]),
   createdAt: createdAt(),
 });
 

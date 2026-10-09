@@ -24,6 +24,7 @@ export function NewStyleForm() {
   const [analyzing, setAnalyzing] = useState<number | false>(false); // cantidad de imágenes en análisis
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [keyVisual, setKeyVisual] = useState<KeyVisualState>({ status: "idle" });
+  const [templatesVersion, setTemplatesVersion] = useState<number | null>(null);
   const [piece, setPiece] = useState<(typeof PIECES)[number]["id"]>("linkedin");
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -64,6 +65,7 @@ export function NewStyleForm() {
         ...(keyVisual.status === "done" ? { v: String(keyVisual.version) } : {}),
         ...(keyVisual.status === "done" && keyVisual.keyVisualUrl ? { kv: "1" } : {}),
         ...(keyVisual.status === "done" && keyVisual.elements?.length ? { el: "1" } : {}),
+        ...(templatesVersion ? { tpl: "1", tv: String(templatesVersion) } : {}),
       })}`
     : null;
 
@@ -91,7 +93,13 @@ export function NewStyleForm() {
                   ))}
                 </div>
                 {upload.reference && (
-                  <ReferencePanel reading={upload.reference} keyVisual={keyVisual} onGenerateKeyVisual={onGenerateKeyVisual} uploadId={upload.uploadId} />
+                  <ReferencePanel
+                    reading={upload.reference}
+                    keyVisual={keyVisual}
+                    onGenerateKeyVisual={onGenerateKeyVisual}
+                    uploadId={upload.uploadId}
+                    onTemplates={setTemplatesVersion}
+                  />
                 )}
               </>
             )}

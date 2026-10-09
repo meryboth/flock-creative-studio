@@ -124,6 +124,8 @@ export type Attendee = {
 // Assets resueltos (data URIs para render final, URLs para previews en la app)
 export type ResolvedAssets = {
   logo: string; // la variante que corresponde al esquema del estilo
+  logoColor: string; // las dos versiones, para las plantillas diseñadas (eligen según el fondo de cada zona)
+  logoWhite: string;
   keyVisual?: string;
   elements?: string[]; // elementos decorativos generados para el estilo (reemplazan a los motivos de código)
   brandPiece: string; // elemento decorativo de marca (SVG)

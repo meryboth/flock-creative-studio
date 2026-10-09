@@ -27,10 +27,10 @@ function modelsFor(provider: Provider, task: Task) {
     : list(process.env.GEMINI_MODELS, "gemini-3.5-flash,gemini-flash-latest");
 }
 
-function create(provider: Provider, model: string, temperature: number) {
+function create(provider: Provider, model: string, temperature: number, maxTokens = 8192) {
   // Los modelos Claude 5.x no aceptan temperature: la consistencia la da el prompt y el esquema cerrado
-  if (provider === "claude") return new ChatAnthropic({ model, apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 1, maxTokens: 8192 });
-  return new ChatGoogleGenerativeAI({ model, apiKey: process.env.GOOGLE_API_KEY, temperature, maxRetries: 1 });
+  if (provider === "claude") return new ChatAnthropic({ model, apiKey: process.env.ANTHROPIC_API_KEY, maxRetries: 1, maxTokens });
+  return new ChatGoogleGenerativeAI({ model, apiKey: process.env.GOOGLE_API_KEY, temperature, maxRetries: 1, maxOutputTokens: maxTokens });
 }
 
 // ─── Telemetría ─────────────────────────────────────────────────────────────
@@ -67,7 +67,15 @@ export function reportLlmCall(r: LlmCallRecord) {
   }
 }
 
-const TASK_BY_NAME: Record<string, string> = { event_copy: "copy", change_set: "editor", reference_style: "reference", critique: "critic", piece_reading: "verifier" };
+const TASK_BY_NAME: Record<string, string> = {
+  event_copy: "copy",
+  change_set: "editor",
+  reference_style: "reference",
+  critique: "critic",
+  piece_reading: "verifier",
+  template_design: "designer",
+  design_review: "design-review",
+};
 
 /** Proveedores habilitados (con su key), en el orden configurado. */
 export function providers(): Provider[] {
@@ -83,7 +91,7 @@ export async function invokeStructured<S extends z.ZodType>(
   task: Task,
   schema: S,
   input: BaseLanguageModelInput,
-  { name, temperature, timeoutMs, prompt }: { name: string; temperature: number; timeoutMs: number; prompt?: { id: string; version: number } },
+  { name, temperature, timeoutMs, prompt, maxTokens }: { name: string; temperature: number; timeoutMs: number; prompt?: { id: string; version: number }; maxTokens?: number },
 ): Promise<{ out: z.infer<S>; model: string }> {
   const enabled = providers();
   if (!enabled.length) throw new Error("No hay proveedor de LLM configurado (ANTHROPIC_API_KEY o GOOGLE_API_KEY)");
@@ -95,7 +103,7 @@ export async function invokeStructured<S extends z.ZodType>(
       attempt++;
       const t0 = Date.now();
       try {
-        const llm = create(provider, model, temperature);
+        const llm = create(provider, model, temperature, maxTokens);
         const method = provider === "claude" ? "jsonSchema" : undefined;
         // includeRaw: además del resultado, el mensaje crudo con el uso de tokens
         const res = (await llm

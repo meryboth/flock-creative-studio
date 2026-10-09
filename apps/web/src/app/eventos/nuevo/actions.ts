@@ -9,7 +9,7 @@ import { copyFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { STORAGE_DIR } from "@/lib/paths";
 import { getLibraryStyle } from "@/lib/style-library";
-import { keyVisualPath, readReference } from "@/lib/reference";
+import { keyVisualPath, readReference, readTemplates } from "@/lib/reference";
 import { uploadElements } from "@/lib/reference";
 import { createEvent, runGeneration, setEventGraphics, type StyleChoice } from "@/lib/studio";
 import { track } from "@/lib/telemetry";
@@ -62,6 +62,7 @@ export async function createEventAction(_prev: FormState, form: FormData): Promi
     style.libraryStyleId = library.id;
     if (library.keyVisual) style.keyVisual = library.keyVisual; // se copian al evento después de crearlo
     if (library.elements.length) style.elements = library.elements;
+    if (library.templates && Object.keys(library.templates).length) style.templates = library.templates;
   } else if (styleId === "referencia") {
     const upload = get("referenceUpload");
     const stored = upload ? await readReference(upload).catch(() => null) : null;
@@ -70,6 +71,7 @@ export async function createEventAction(_prev: FormState, form: FormData): Promi
     style.referenceUpload = upload;
     if (get("keyVisual") === "1" && existsSync(keyVisualPath(upload))) style.keyVisual = `uploads/${upload}/keyvisual.png`;
     if (get("elements") === "1") style.elements = await uploadElements(upload);
+    if (get("templates") === "1") style.templates = (await readTemplates(upload)) ?? undefined;
   }
 
   const id = await createEvent({
@@ -112,6 +114,7 @@ export async function createEventAction(_prev: FormState, form: FormData): Promi
       fromLibrary: Boolean(style.libraryStyleId),
       fromReference: styleId === "referencia" && !style.libraryStyleId,
       aiGraphics: Boolean(graphics.keyVisual || graphics.elements),
+      aiTemplates: Object.keys(style.templates ?? {}).length,
       outputs,
       agendaItems: agenda.length,
       attendees: attendees.length,

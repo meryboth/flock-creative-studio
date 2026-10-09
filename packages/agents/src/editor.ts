@@ -19,6 +19,7 @@ const Operation = z.object({
     "setCopy", // field + text (solo posteos de LinkedIn y mensajes de Slack)
     "setLayout", // value: clasico | tipografico | bloques
     "setDevice", // value: pills | halftone; number 1 (activar) o 0 (desactivar)
+    "redesign", // prompt: instrucción para el diseñador (solo con plantillas diseñadas por IA)
     "newVariant", // otra composición del visual
     "regenerateKeyVisual", // prompt (en inglés)
   ]),
@@ -48,6 +49,7 @@ export type EditContext = {
   layout?: string;
   piece: { file: string; label: string; group: string; headline?: string; body?: string } | null;
   canRegenerateGraphics: boolean;
+  canRedesign?: boolean; // el estilo tiene plantillas diseñadas por IA
 };
 
 /** Traduce un pedido en lenguaje natural a operaciones sobre las piezas (vocabulario cerrado). */
@@ -82,6 +84,8 @@ function valid(o: EditOperation) {
       return Boolean(o.field && o.text?.trim());
     case "regenerateKeyVisual":
       return Boolean(o.prompt?.trim());
+    case "redesign":
+      return Boolean(o.prompt?.trim());
     case "setLayout":
       return (LAYOUTS as string[]).includes(o.value ?? "");
     case "setDevice":
@@ -108,6 +112,9 @@ function prompt(c: EditContext) {
       : "ninguna (el cambio es general)",
     fonts: FONTS.map((f) => `  - ${f}: ${FONT_CATALOG[f].meta.character}`).join("\n"),
     keyVisualAvailability: c.canRegenerateGraphics ? "Disponible." : "NO disponible para este estilo: decilo si lo piden.",
+    redesign: c.canRedesign
+      ? "- redesign: prompt en español con la instrucción concreta para el diseñador (ej. \"el nombre del evento más grande, ocupando la tarjeta azul\"). Estas piezas usan plantillas diseñadas por IA: usalo para cambios de composición, ilustración, recursos gráficos o tipografía (en vez de setLayout, setDevice o setFont)."
+      : "- redesign: NO disponible (las piezas de este evento usan plantillas de código).",
     message: c.message,
   });
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { GraphicsProgress } from "./progress-views";
+import { TemplatesDesigner } from "./templates-designer";
 
 // Post-it "lo que vimos": cómo se interpretó una referencia gráfica (se usa en eventos y en la biblioteca)
 
@@ -41,11 +42,13 @@ export function ReferencePanel({
   keyVisual,
   onGenerateKeyVisual,
   uploadId,
+  onTemplates,
 }: {
   reading: ReferenceReading;
   keyVisual?: KeyVisualState;
   onGenerateKeyVisual?: () => void;
   uploadId?: string; // para seguir el progreso del key visual
+  onTemplates?: (version: number | null) => void; // plantillas diseñadas por IA listas
 }) {
   return (
     <div className="taped -rotate-[0.6deg] space-y-3 bg-yellow p-5 text-sm shadow-md">
@@ -115,6 +118,7 @@ export function ReferencePanel({
           ))}
         </div>
       ) : null}
+      {uploadId && onTemplates && <TemplatesDesigner uploadId={uploadId} onChange={onTemplates} />}
     </div>
   );
 }

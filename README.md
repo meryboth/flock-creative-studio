@@ -66,6 +66,8 @@ La app y la CLI funcionan sin ellos: el evento de ejemplo se genera sin imagen p
 | Editor | Claude | Pedido en lenguaje natural → operaciones tipadas, con alcance | `editor` |
 | Verificador de lectura | Claude con visión | Confirma horarios, títulos y nombres completos en las piezas | `verifier` |
 | Ilustrador | Gemini Image → ComfyUI (SDXL local) | Key visual y elementos en la técnica de la referencia | `keyvisual`, `elements` |
+| Diseñador de plantillas | Claude con visión | HTML/CSS de los posteos y el cronograma en el estilo de la referencia, con reglas fijas | `designer` |
+| Revisor de diseño | Claude con visión | Compara cada plantilla con la referencia y pide correcciones | `design-review` |
 
 Lo visual (paletas, composiciones, fuentes, formas, plantillas) es **código con semilla**: reproducible, sin costo y editable por parámetros. Los modelos leen, escriben, critican y verifican; no dibujan las piezas. Los prompts están versionados en `packages/agents/prompts/` y cada llamada registra cuál usó.
 
@@ -100,6 +102,7 @@ El proveedor principal es **Gemini Image** (requiere facturación activa en el p
 |---|---|
 | `pnpm test` | Tests (Vitest) |
 | `pnpm evals [--suite copy,editor,reference,verifier,design]` | Evals sobre casos fijos; guarda en la base y en `docs/evals/resultados.md` |
+| `pnpm design:templates <imagen> [--piezas …] [--rondas N]` | Diseña con IA las plantillas de un estilo desde la terminal (salida en `storage/diseños/`) |
 | `pnpm prompts:lock` | Actualiza el hash de los prompts después de cambiar uno (y subir su versión) |
 | `pnpm diversity --label X --ref nombre=ruta [--critic]` | Hoja de contactos para medir la diversidad de lo que se genera (ver docs/informes/14) |
 | `pnpm db:up` / `db:down` | Levanta / baja Postgres + pgvector en OrbStack (puerto **5433**) |

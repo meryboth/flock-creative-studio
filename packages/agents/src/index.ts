@@ -8,3 +8,4 @@ export { critiquePiece, applyCritique, type Critique } from "./critic";
 export { reconcileFields, verifyPieceReading, type ExpectedField, type FieldCheck, type ReadingCheck } from "./verifier";
 export { loadPrompt, listPrompts, loadFragments, parsePrompt, promptsLockPath, promptsSnapshot, renderTemplate, type Prompt } from "./prompts";
 export { costOf, prices, DEFAULT_PRICES, type Price } from "./pricing";
+export { designTemplate, reviewDesign, type DesignReview } from "./designer";

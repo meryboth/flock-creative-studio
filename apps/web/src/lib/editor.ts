@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { and, desc, eq } from "drizzle-orm";
 import { db, schema } from "@flock/db";
 import { generateKeyVisual, interpretEdit, type EditOperation } from "@flock/agents";
-import { addPatch, groupOf, GROUP_LABEL, type Overrides, type Patch, type PieceGroup, type PieceType } from "@flock/studio";
-import { buildKit, STYLES, type EventContent, type Language } from "@flock/templates";
+import { addPatch, designPiece, groupOf, GROUP_LABEL, type Overrides, type Patch, type PieceGroup, type PieceType } from "@flock/studio";
+import { buildKit, STYLES, type DesignedPieceId, type EventContent, type Language } from "@flock/templates";
 import { REPO_ROOT, STORAGE_DIR, UPLOADS_DIR } from "./paths";
 import type { StyleChoice } from "./studio";
 import { track, withTelemetry } from "./telemetry";
@@ -43,6 +43,8 @@ export function describeOperation(o: EditOperation): string {
       return `composición ${LAYOUT_LABEL[o.value!] ?? o.value}`;
     case "setDevice":
       return `${o.number ? "sumar" : "sacar"} ${o.value === "pills" ? "píldoras" : "semitono"}`;
+    case "redesign":
+      return `rediseñar: ${o.prompt}`;
     case "newVariant":
       return "otra variante";
     case "regenerateKeyVisual":
@@ -110,7 +112,9 @@ export async function proposeChange(eventId: string, message: string, pieceFile:
     piece: piece
       ? { file: piece.file!, label: (piece.data as { label?: string }).label ?? piece.file!, group: GROUP_LABEL[groupOf(piece.type as PieceType)], headline: post?.headline, body: post?.body }
       : null,
-    canRegenerateGraphics: Boolean(style.reference),
+    // Con plantillas diseñadas, las ilustraciones son parte de la plantilla: se cambian rediseñando, no con un key visual
+    canRegenerateGraphics: Boolean(style.reference) && !Object.keys(style.templates ?? {}).length,
+    canRedesign: Boolean(style.templates && Object.keys(style.templates).length),
   }));
   // setCopy solo tiene sentido sobre un posteo o mensaje elegido
   const operations = proposal.operations.filter((o) => o.op !== "setCopy" || post);
@@ -192,7 +196,53 @@ export async function applyChange(changeId: string, scope: Scope) {
     await tx.update(schema.changeSets).set({ status: "applied", scope, before }).where(eq(schema.changeSets.id, changeId));
   });
   track("change.applied", { eventId: change.eventId, props: { ops: ops.map((o) => o.op), scope: scope.kind, suggested: change.suggestedScope } });
-  return change.eventId;
+  const redesignOp = ops.find((o) => o.op === "redesign");
+  return {
+    eventId: change.eventId,
+    // El rediseño tarda (el diseñador y el revisor): lo hace quien llama, en segundo plano, antes de regenerar
+    redesign: redesignOp ? { instruction: redesignOp.prompt!, pieces: designedPiecesFor(scope, Object.keys(style.templates ?? {}) as DesignedPieceId[]) } : null,
+  };
+}
+
+/** Qué plantillas diseñadas toca un cambio según su alcance. */
+function designedPiecesFor(scope: Scope, available: DesignedPieceId[]): DesignedPieceId[] {
+  const pick = (ids: DesignedPieceId[]) => ids.filter((id) => available.includes(id));
+  if (scope.kind === "all") return available;
+  if (scope.kind === "group")
+    return pick(scope.group === "linkedin" ? ["linkedin-square", "linkedin-landscape"] : scope.group === "slack" ? ["linkedin-landscape"] : scope.group === "agenda" ? ["agenda-slide", "agenda-summary"] : []);
+  const f = scope.file;
+  if (/^linkedin\/.+-square\.png$/.test(f)) return pick(["linkedin-square"]);
+  if (/^linkedin\/.+-landscape\.png$/.test(f) || f.startsWith("slack/")) return pick(["linkedin-landscape"]);
+  if (f === "cronograma/resumen.png") return pick(["agenda-summary"]);
+  if (f.startsWith("cronograma/")) return pick(["agenda-slide"]);
+  return [];
+}
+
+/** Rediseña plantillas del evento con una instrucción del chat (diseñador + revisor, una ronda). */
+export async function redesignTemplates(eventId: string, instruction: string, pieces: DesignedPieceId[]) {
+  const event = await loadEvent(eventId);
+  const style = event.style as StyleChoice;
+  if (!style.templates || !pieces.length) return;
+  const references = await referenceImagesFor(style);
+  if (!references.length) throw new Error("No encontré las imágenes de referencia de este estilo");
+  const t0 = Date.now();
+  const results = await withTelemetry({ eventId }, () =>
+    Promise.allSettled(
+      pieces.map((piece) =>
+        designPiece({ references, piece, reading: style.reference, repoRoot: REPO_ROOT, rounds: 1, start: style.templates![piece], instruction }),
+      ),
+    ),
+  );
+  const templates = { ...style.templates };
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled") templates[pieces[i]] = r.value.template;
+  });
+  await db.update(schema.events).set({ style: { ...style, templates } }).where(eq(schema.events.id, eventId));
+  track("templates.redesigned", {
+    eventId,
+    durationMs: Date.now() - t0,
+    props: { pieces, ok: results.filter((r) => r.status === "fulfilled").length },
+  });
 }
 
 export async function discardChange(changeId: string) {

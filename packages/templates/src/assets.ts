@@ -42,22 +42,28 @@ export async function resolveAssets(kit: EventKit, mode: AssetMode): Promise<Res
   // Logo según el esquema del estilo: blanco sobre oscuro, color sobre claro
   const logoFile = brandFile(kit.style.palette.scheme === "dark" ? kit.logo.onDark : kit.logo.onLight, manifest.logos);
   const pieceFile = brandFile("pieza-outline-gradient", manifest.elements);
+  const colorFile = brandFile(kit.logo.onLight, manifest.logos);
+  const whiteFile = brandFile(kit.logo.onDark, manifest.logos);
   const families = [...new Set([kit.style.fonts.display, kit.style.fonts.body])];
 
   if (mode.kind === "inline") {
-    const [logo, brandPiece, keyVisual, ...faces] = await Promise.all([
+    const [logo, logoColor, logoWhite, brandPiece, keyVisual, ...faces] = await Promise.all([
       dataUri(join(mode.brandDir, logoFile)),
+      dataUri(join(mode.brandDir, colorFile)),
+      dataUri(join(mode.brandDir, whiteFile)),
       dataUri(join(mode.brandDir, pieceFile)),
       mode.keyVisualPath ? dataUri(mode.keyVisualPath) : undefined,
       ...families.map((f) => fontFaceCss(f, fontDataUri)),
     ]);
     const elements = mode.elementPaths?.length ? await Promise.all(mode.elementPaths.map(dataUri)) : undefined;
-    return { logo, brandPiece, keyVisual, elements, fontCss: faces.join("\n") };
+    return { logo, logoColor, logoWhite, brandPiece, keyVisual, elements, fontCss: faces.join("\n") };
   }
 
   const faces = await Promise.all(families.map((f) => fontFaceCss(f, mode.fontUrl)));
   return {
     logo: mode.brandUrl(logoFile),
+    logoColor: mode.brandUrl(colorFile),
+    logoWhite: mode.brandUrl(whiteFile),
     brandPiece: mode.brandUrl(pieceFile),
     keyVisual: mode.keyVisualUrl,
     elements: mode.elementUrls?.length ? mode.elementUrls : undefined,

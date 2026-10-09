@@ -16,7 +16,8 @@
     "diversity": "pnpm --filter @flock/templates build && tsx --env-file-if-exists=.env tools/diversity-sheet.ts",
     "evals": "pnpm --filter @flock/templates build && tsx --env-file-if-exists=.env tools/evals/run.ts",
     "prompts:lock": "tsx tools/prompts-lock.ts",
-    "test": "pnpm --filter @flock/templates build && vitest run"
+    "test": "pnpm --filter @flock/templates build && vitest run",
+    "design:templates": "pnpm --filter @flock/templates build && tsx --env-file-if-exists=.env tools/design-templates.ts"
   },
   "devDependencies": {
     "tsx": "^4.23.15",

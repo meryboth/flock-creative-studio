@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { llmProviders, verifyPieceReading, type ExpectedField, type FieldCheck } from "@flock/agents";
 import { closeRenderer, renderFullPage, renderPdf, renderPngChecked, type RenderIssue } from "@flock/renderer";
 import { OUTPUT_IDS, type OutputId } from "./outputs";
+import type { Patch } from "./overrides";
 import {
   agendaSlide,
   agendaSummary,
@@ -23,6 +24,10 @@ import {
   type PieceOptions,
   type RenderContext,
   type ResolvedAssets,
+  renderDesigned,
+  type DesignedData,
+  type DesignedPieceId,
+  type DesignedTemplate,
 } from "@flock/templates";
 
 export type PieceType = "linkedin" | "linkedin-text" | "slack" | "slack-text" | "agenda-slide" | "agenda-summary" | "badge" | "badge-sheet" | "certificate" | "landing";
@@ -39,6 +44,8 @@ export type GenerateInput = {
   keyVisualPath?: string;
   elementPaths?: string[]; // elementos decorativos generados para el estilo
   outputs?: OutputId[]; // grupos a generar (por defecto, todos)
+  // Plantillas diseñadas por IA: reemplazan a las de código en esas piezas
+  designed?: Partial<Record<DesignedPieceId, DesignedTemplate>>;
   // Verificador de lectura con visión sobre una muestra de piezas (por defecto, si hay un LLM configurado)
   verifyReading?: boolean;
   // Ajustes por pieza (editor conversacional). `file` es la ruta relativa de la pieza, ej. "linkedin/anuncio-square.png"
@@ -58,7 +65,7 @@ export type GenerateResult = {
 };
 
 /** Ajuste de una pieza pedido en el editor: otro kit (colores, fuentes) y/o opciones de plantilla. */
-export type PieceAdjust = { kit?: EventKit; options?: PieceOptions };
+export type PieceAdjust = { kit?: EventKit; options?: PieceOptions; patch?: Patch };
 
 /** Genera la familia completa de piezas de un evento. */
 export async function generateFamily(input: GenerateInput): Promise<GenerateResult> {
@@ -121,10 +128,32 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
    * Renderiza una pieza con control geométrico: si algún texto queda recortado o fuera del lienzo,
    * la vuelve a generar con el título más chico (hasta dos veces) y registra lo que quede.
    */
-  const shoot = async (template: string, path: string, type: PieceType, size: { width: number; height: number }, render: (c: RenderContext) => string) => {
+  /**
+   * Render de una pieza con plantilla diseñada por IA, si el estilo la tiene. Respeta los ajustes del chat
+   * que una plantilla diseñada entiende: colores (variables de la paleta), tamaño del título y ocultar.
+   */
+  const designedFor = (id: DesignedPieceId, data: DesignedData) => {
+    const t = input.designed?.[id];
+    if (!t) return null;
+    return async (c: RenderContext, patch?: Patch) => {
+      const k = { ...c.kit, style: { ...c.kit.style, fonts: { display: t.display, body: t.body } } };
+      const a = await assetsFor(k);
+      return renderDesigned(t, data, a, { colors: patch?.colors, titleScale: c.options?.titleScale, hide: c.options?.hide });
+    };
+  };
+
+  const shoot = async (
+    template: string,
+    path: string,
+    type: PieceType,
+    size: { width: number; height: number },
+    render: (c: RenderContext) => string,
+    designed?: ((c: RenderContext, patch?: Patch) => Promise<string>) | null,
+  ) => {
     let c = await ctxFor(path, type);
+    const patch = input.adjust?.({ file: path, type })?.patch;
     for (let attempt = 0; ; attempt++) {
-      const html = render(c);
+      const html = designed ? await designed(c, patch) : render(c);
       const { png, issues } = await renderPngChecked(html, size);
       if (!issues.length || attempt === 2) {
         sample(template, html);
@@ -140,7 +169,15 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
     for (const post of linkedin) {
       for (const format of ["square", "landscape"] as LinkedInFormat[]) {
         const path = `linkedin/${post.id}-${format}.png`;
-        const png = await shoot(`linkedin-${format}`, path, "linkedin", linkedinPost.sizes[format], (c) => linkedinPost.render(c, post, format));
+        const data: DesignedData = { EVENT_NAME: kit.event.name, HEADLINE: post.headline, BODY: post.body ?? "", DATE: kit.event.dateLabel, HASHTAG: kit.event.hashtag, LOCATION: kit.event.location ?? "" };
+        const png = await shoot(
+          `linkedin-${format}`,
+          path,
+          "linkedin",
+          linkedinPost.sizes[format],
+          (c) => linkedinPost.render(c, post, format),
+          designedFor(format === "square" ? "linkedin-square" : "linkedin-landscape", data),
+        );
         await save({ type: "linkedin", template: `linkedin-${format}`, label: `${post.headline} (${format === "square" ? "cuadrado" : "apaisado"})`, path }, png);
         if (format === "square" && post === linkedin[0])
           toVerify.push({ path, expected: [{ field: "titular", value: post.headline }, { field: "fecha", value: kit.event.dateLabel }] });
@@ -151,8 +188,13 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
     // Slack: imagen apaisada (se lee bien en el canal) + el texto del mensaje
     for (const msg of slack) {
       const path = `slack/${msg.id}.png`;
-      const png = await shoot("slack", path, "slack", linkedinPost.sizes.landscape, (c) =>
-        linkedinPost.render(c, { id: `slack-${msg.id}`, headline: msg.headline, body: msg.body, post: msg.text }, "landscape"),
+      const png = await shoot(
+        "slack",
+        path,
+        "slack",
+        linkedinPost.sizes.landscape,
+        (c) => linkedinPost.render(c, { id: `slack-${msg.id}`, headline: msg.headline, body: msg.body, post: msg.text }, "landscape"),
+        designedFor("linkedin-landscape", { EVENT_NAME: kit.event.name, HEADLINE: msg.headline, BODY: msg.body ?? "", DATE: kit.event.dateLabel, HASHTAG: kit.event.hashtag, LOCATION: kit.event.location ?? "" }),
       );
       await save({ type: "slack", template: "slack", label: `Slack: ${msg.headline}`, path }, png);
       if (msg === slack[0]) toVerify.push({ path, expected: [{ field: "titular", value: msg.headline }] });
@@ -163,7 +205,18 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
     if (agenda.length) {
       for (const [i, item] of agenda.entries()) {
         const path = `cronograma/${String(i + 1).padStart(2, "0")}-${slugify(item.title)}.png`;
-        const png = await shoot("agenda-slide", path, "agenda-slide", agendaSlide.size, (c) => agendaSlide.render(c, item, i));
+        const slideData: DesignedData = {
+          START: item.start,
+          END: item.end ?? "",
+          TITLE: item.title,
+          SPEAKER: [item.speaker, item.room].filter(Boolean).join(" · "),
+          INDEX: String(i + 1).padStart(2, "0"),
+          EVENT_NAME: kit.event.name,
+          DATE: kit.event.dateLabel,
+          HASHTAG: kit.event.hashtag,
+          LOCATION: kit.event.location ?? "",
+        };
+        const png = await shoot("agenda-slide", path, "agenda-slide", agendaSlide.size, (c) => agendaSlide.render(c, item, i), designedFor("agenda-slide", slideData));
         await save({ type: "agenda-slide", template: "agenda-slide", label: `${item.start} ${item.title}`, path }, png);
         // Los horarios son el dato más delicado: se verifican todas las slides
         toVerify.push({
@@ -175,7 +228,20 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
           ],
         });
       }
-      const summary = await shoot("agenda-summary", "cronograma/resumen.png", "agenda-summary", agendaSummary.size, (c) => agendaSummary.render(c, agenda));
+      const summary = await shoot(
+        "agenda-summary",
+        "cronograma/resumen.png",
+        "agenda-summary",
+        agendaSummary.size,
+        (c) => agendaSummary.render(c, agenda),
+        designedFor("agenda-summary", {
+          EVENT_NAME: kit.event.name,
+          DATE: kit.event.dateLabel,
+          HASHTAG: kit.event.hashtag,
+          LOCATION: kit.event.location ?? "",
+          rows: agenda.map((it) => ({ START: it.start, END: it.end ?? "", TITLE: it.title })),
+        }),
+      );
       await save({ type: "agenda-summary", template: "agenda-summary", label: "Cronograma completo", path: "cronograma/resumen.png" }, summary);
       toVerify.push({
         path: "cronograma/resumen.png",
@@ -269,7 +335,7 @@ async function designQa(repoRoot: string, qaDir: string, samples: Map<string, st
   }
   let report: string;
   try {
-    report = (await promisify(execFile)(detector, ["detect", ...files], { cwd: repoRoot, maxBuffer: 10 * 1024 * 1024 })).stdout;
+    report = (await promisify(execFile)(detector, ["detect", "--no-advisory", ...files], { cwd: repoRoot, maxBuffer: 10 * 1024 * 1024 })).stdout;
   } catch (err) {
     // el detector sale con código ≠ 0 cuando encuentra problemas
     const { stdout = "", stderr = "" } = err as { stdout?: string; stderr?: string };
