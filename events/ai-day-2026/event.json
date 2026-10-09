@@ -1,0 +1,15 @@
+{
+  "event": {
+    "name": "AI Day 2026",
+    "date": "2026-10-09",
+    "location": "Oficinas Flock + Teams",
+    "hashtag": "#FLOCKAIDAY",
+    "tagline": "LEARN · EXPERIMENT · EVOLVE TOGETHER",
+    "description": "Una jornada para aprender, experimentar y evolucionar juntos en la adopción de IA.",
+    "language": "es"
+  },
+  "styleId": "iridiscente",
+  "seeds": { "accent": "#1f2bff", "accent2": "#c35cff" },
+  "seed": 7,
+  "keyVisual": "assets/kv_master.png"
+}

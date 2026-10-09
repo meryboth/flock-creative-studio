@@ -1,0 +1,19 @@
+{
+  "name": "@flock/tools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@flock/agents": "workspace:*",
+    "@flock/renderer": "workspace:*",
+    "@flock/studio": "workspace:*",
+    "@flock/templates": "workspace:*",
+    "@imgly/background-removal-node": "^1.4.5",
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}

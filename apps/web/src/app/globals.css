@@ -1,0 +1,193 @@
+@import "tailwindcss";
+
+/*
+ * Flock Creative Studio — un cuaderno de estudio sobre una mesa de corte:
+ * hoja rayada sobre grilla gris, stickers, cinta y anotaciones a mano.
+ */
+:root {
+  --desk: #8e8e8e; /* mesa con grilla, detrás de la hoja */
+  --background: #f8f7f2; /* papel */
+  --surface: #ffffff;
+  --rule: rgba(22, 22, 22, 0.075); /* renglones */
+  --border: rgba(22, 22, 22, 0.16);
+  --foreground: #161616;
+  --muted: #55534d;
+  --ink: #161616;
+  --orange: #ff5102; /* naranja Flock: marco a mano, alertas */
+  --violet: #2d4fd8; /* acento interactivo (azul) */
+  --yellow: #f4c430;
+  --pink: #ef4a8a;
+  --green: #17a05a;
+  --mint: #bfe8d4;
+  --tape: rgba(222, 226, 196, 0.82);
+}
+
+@theme inline {
+  --color-desk: var(--desk);
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-ink: var(--ink);
+  --color-orange: var(--orange);
+  --color-violet: var(--violet);
+  --color-yellow: var(--yellow);
+  --color-pink: var(--pink);
+  --color-green: var(--green);
+  --color-mint: var(--mint);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-pixel: var(--font-pixelify);
+  --font-hand: var(--font-caveat);
+}
+
+html {
+  background: var(--desk);
+}
+
+/* Mesa: grilla blanca sobre gris */
+body {
+  color: var(--foreground);
+  background-color: var(--desk);
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.55) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.55) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+/* Hoja: papel rayado */
+.sheet {
+  background-color: var(--background);
+  background-image: linear-gradient(transparent 27px, var(--rule) 28px);
+  background-size: 100% 28px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08), 0 18px 40px -18px rgba(0, 0, 0, 0.35);
+}
+
+::selection {
+  background: var(--yellow);
+  color: var(--ink);
+}
+:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
+}
+input,
+textarea,
+select {
+  color-scheme: light;
+}
+
+/* Etiquetas en mono, como en la referencia */
+.label-mono {
+  font-family: var(--font-geist-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Sticker con borde recortado (zigzag en los laterales) */
+.sticker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.3em 0.9em;
+  font-weight: 600;
+  clip-path: polygon(
+    0 0, 100% 0, 98% 12%, 100% 25%, 98% 37%, 100% 50%, 98% 62%, 100% 75%, 98% 87%, 100% 100%,
+    0 100%, 2% 87%, 0 75%, 2% 62%, 0 50%, 2% 37%, 0 25%, 2% 12%
+  );
+}
+
+/* Cinta adhesiva sobre fotos y piezas */
+.taped {
+  position: relative;
+}
+.taped::before,
+.taped::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  width: 64px;
+  height: 20px;
+  background: var(--tape);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.06);
+  pointer-events: none;
+}
+.taped::before {
+  top: -9px;
+  left: -14px;
+  transform: rotate(-32deg);
+}
+.taped::after {
+  top: -9px;
+  right: -14px;
+  transform: rotate(30deg);
+}
+
+/* Marco dibujado a mano */
+.hand-frame {
+  border: 2.5px solid var(--orange);
+  border-radius: 255px 14px 225px 14px / 14px 225px 14px 255px;
+}
+
+/* Pestaña de carpeta */
+.folder-tab {
+  clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 100%, 0 100%);
+  padding: 0.55rem 2.2rem 0.55rem 1.1rem;
+}
+
+/* Botón principal: caja negra con texto en mono */
+.btn-ink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--ink);
+  color: #fff;
+  padding: 0.75rem 1.1rem;
+  font-family: var(--font-geist-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.2s;
+}
+.btn-ink:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 3px 3px 0 var(--yellow);
+}
+.btn-ink:disabled {
+  opacity: 0.5;
+  transform: none;
+  box-shadow: none;
+}
+.btn-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1.5px solid var(--ink);
+  background: var(--surface);
+  padding: 0.55rem 0.9rem;
+  font-family: var(--font-geist-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: background 0.15s;
+}
+.btn-line:hover {
+  background: var(--yellow);
+}
+.btn-line:disabled {
+  opacity: 0.5;
+  background: var(--surface);
+}
+
+/* Título de sección en recuadro */
+.boxed {
+  display: inline-block;
+  border: 1.5px solid var(--ink);
+  background: var(--surface);
+  padding: 0.15rem 0.7rem;
+}

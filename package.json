@@ -1,0 +1,20 @@
+{
+  "name": "flock-event-studio",
+  "private": true,
+  "packageManager": "pnpm@10.34.6",
+  "scripts": {
+    "dev": "pnpm --filter @flock/templates build && pnpm --parallel --filter @flock/templates --filter @flock/web dev",
+    "build": "pnpm --filter @flock/templates build && pnpm --filter @flock/web build",
+    "db:up": "docker --context orbstack compose up -d --wait",
+    "db:down": "docker --context orbstack compose down",
+    "db:generate": "pnpm --filter @flock/db generate",
+    "db:migrate": "pnpm --filter @flock/db migrate",
+    "db:seed": "pnpm --filter @flock/db seed",
+    "db:studio": "pnpm --filter @flock/db studio",
+    "bootstrap": "pnpm db:up && pnpm db:migrate && pnpm db:seed && pnpm --filter @flock/templates build",
+    "render:event": "pnpm --filter @flock/templates build && tsx tools/render-event.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15"
+  }
+}

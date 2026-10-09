@@ -1,0 +1,14 @@
+node_modules/
+.next/
+dist/
+storage/
+.env
+.env.local
+.DS_Store
+*.tsbuildinfo
+dist/
+
+# Assets que no se publican (repo público): piezas de la agencia y material interno de Flock
+references/
+events/*/assets/
+brand/elements/cover-raw-*.png

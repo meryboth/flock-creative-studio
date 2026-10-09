@@ -1,0 +1,21 @@
+{
+  "name": "@flock/studio",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@flock/renderer": "workspace:*",
+    "@flock/templates": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "@types/react": "^19.3.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@flock/agents",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@flock/templates": "workspace:*",
+    "@imgly/background-removal-node": "^1.4.5",
+    "@langchain/core": "^1.2.17",
+    "@langchain/google-genai": "^2.3.2",
+    "culori": "^4.0.2",
+    "node-vibrant": "^4.0.4",
+    "sharp": "^0.35.5",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/culori": "^4.0.1",
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3"
+  }
+}

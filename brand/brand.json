@@ -1,0 +1,99 @@
+{
+  "$comment": "Manifiesto del brand kit de Flock. El sistema lo carga al iniciar (seed a la tabla brand_kit). Completar con los archivos reales.",
+  "name": "Flock IT",
+  "logos": [
+    {
+      "id": "horizontal-color",
+      "file": "logos/flock-horizontal-color.svg",
+      "type": "horizontal",
+      "color": "color",
+      "useOn": "light",
+      "minWidthPx": 120,
+      "clearSpace": "0.5x",
+      "status": "ok",
+      "$comment": "isotipo naranja #FF5102 + pieza violeta #7F07C5, wordmark #44016B"
+    },
+    {
+      "id": "horizontal-white",
+      "file": "logos/flock-horizontal-white.svg",
+      "type": "horizontal",
+      "color": "white",
+      "useOn": "dark",
+      "minWidthPx": 120,
+      "clearSpace": "0.5x",
+      "status": "ok"
+    },
+    {
+      "id": "isotipo-outline-white",
+      "file": "logos/flock-isotipo-outline-white.svg",
+      "type": "isotipo",
+      "style": "outline",
+      "color": "white",
+      "useOn": "dark",
+      "minWidthPx": 32,
+      "clearSpace": "0.5x",
+      "status": "ok"
+    },
+    {
+      "id": "horizontal-black",
+      "file": "logos/flock-horizontal-black.svg",
+      "type": "horizontal",
+      "color": "black",
+      "useOn": "light-mono",
+      "status": "derivado del blanco (validar con marca)",
+      "minWidthPx": 120,
+      "clearSpace": "0.5x"
+    },
+    {
+      "id": "isotipo-color",
+      "file": "logos/flock-isotipo-color.svg",
+      "type": "isotipo",
+      "color": "color",
+      "useOn": "light",
+      "status": "pendiente (se puede recortar del horizontal color)"
+    }
+  ],
+  "colors": {
+    "$comment": "Extraídos de los SVG oficiales y de las variables de Figma (colección 2025). Falta confirmar la paleta completa.",
+    "orange": "#FF5102",
+    "violet": "#7F07C5",
+    "purpleDeep": "#44016B",
+    "violeta3": "#180026",
+    "white": "#FFFFFF",
+    "gradient": {
+      "brand": "linear-gradient(135deg, #FF5102 0%, #7F07C5 100%)"
+    }
+  },
+  "fonts": [
+    {
+      "$comment": "familia, archivo y licencia",
+      "family": "",
+      "role": "institutional",
+      "files": [],
+      "license": ""
+    }
+  ],
+  "rules": {
+    "doNot": [
+      "deformar, rotar o recolorear el logo",
+      "aplicar efectos (sombras, blur, degradados) sobre el logo",
+      "colocar el logo sobre fondos sin contraste suficiente",
+      "generar o redibujar el logo con IA",
+      "usar la pieza decorativa como reemplazo del logo"
+    ]
+  },
+  "elements": [
+    {
+      "id": "pieza-outline-gradient",
+      "file": "elements/flock-pieza-outline-gradient.svg",
+      "desc": "Una 'pieza' del isotipo en contorno con degradado naranja→violeta",
+      "useAs": "recurso gráfico decorativo (puede escalarse, rotarse y recortarse contra bordes)"
+    },
+    {
+      "id": "cover-ribbons",
+      "file": "elements/cover-raw-1.png",
+      "desc": "Fondo abstracto 3D de cintas violetas (portada Flock | General), 4096x2793",
+      "useAs": "fondo institucional / referencia de estilo"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+# Levantar con OrbStack: docker --context orbstack compose up -d
+name: flock-ai-day
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: flock
+      POSTGRES_PASSWORD: flock
+      POSTGRES_DB: flock_event_studio
+    ports:
+      - "5433:5432"   # 5432 ya está ocupado en esta Mac
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flock -d flock_event_studio"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

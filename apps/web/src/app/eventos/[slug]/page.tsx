@@ -1,0 +1,163 @@
+import { Suspense } from "react";
+import Link from "next/link";
+import { STYLES } from "@flock/templates";
+import { AutoRefresh } from "@/components/auto-refresh";
+import { listPieces, readText, storageUrl } from "@/lib/pieces";
+import { getEvent, type StyleChoice } from "@/lib/studio";
+import { newVariantAction, rewriteCopyAction } from "./actions";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export default function EventPage({ params }: PageProps<"/eventos/[slug]">) {
+  return (
+    <main className="px-5 py-10 sm:px-10">
+      <Link href="/" className="label-mono text-muted hover:text-ink">
+        ← Eventos
+      </Link>
+      <Suspense fallback={<p className="mt-10 text-muted">Cargando…</p>}>
+        <EventContent params={params} />
+      </Suspense>
+    </main>
+  );
+}
+
+async function EventContent({ params }: { params: PageProps<"/eventos/[slug]">["params"] }) {
+  const { slug } = await params;
+  // Eventos creados en la app (uuid) o generados por CLI (carpeta en storage/)
+  const data = UUID.test(slug) ? await getEvent(slug) : null;
+
+  if (!data) {
+    return (
+      <>
+        <header className="mb-12 mt-4 border-b border-border pb-8">
+          <h1 className="text-4xl font-semibold tracking-tight">{slug}</h1>
+          <p className="mt-2 text-muted">Generado desde la línea de comandos.</p>
+        </header>
+        <Gallery folder={slug} />
+      </>
+    );
+  }
+
+  const { event, run } = data;
+  const style = event.style as StyleChoice | null;
+  // El evento pasa a "producing" antes de que arranque la generación en segundo plano
+  const running = run?.status === "running" || run?.status === "queued" || event.status === "producing";
+  const failed = run?.status === "failed";
+  const dateLabel = event.date
+    ? new Date(`${event.date}T12:00:00`).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+    : null;
+
+  return (
+    <>
+      <header className="mb-10 mt-4 flex flex-wrap items-end justify-between gap-6 border-b border-border pb-8">
+        <div>
+          <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">{event.name}</h1>
+          <p className="mt-2 text-muted">
+            {[dateLabel, event.location, style && `estilo ${STYLES[style.styleId].name}`, style && `variante ${style.seed}`].filter(Boolean).join(" · ")}
+          </p>
+        </div>
+        {!running && (
+          <div className="flex flex-wrap gap-3">
+            <form action={newVariantAction.bind(null, event.id)}>
+              <button className="btn-line">Otra variante</button>
+            </form>
+            <form action={rewriteCopyAction.bind(null, event.id)}>
+              <button className="btn-line">Reescribir textos</button>
+            </form>
+          </div>
+        )}
+      </header>
+
+      {running && (
+        <section aria-live="polite" className="taped mb-12 -rotate-[0.4deg] border-[1.5px] border-ink bg-surface p-6 shadow-md">
+          <AutoRefresh />
+          <p className="font-hand text-3xl font-bold leading-none">{run?.stage ?? "Preparando"}…</p>
+          <div className="mt-5 h-3 overflow-hidden border-[1.5px] border-ink bg-background" role="progressbar" aria-valuemin={0} aria-valuemax={run?.total || 1} aria-valuenow={run?.progress ?? 0}>
+            <div
+              className="h-full bg-yellow transition-[width] duration-500"
+              style={{ width: run?.total ? `${(run.progress / run.total) * 100}%` : "6%" }}
+            />
+          </div>
+          <p className="mt-3 text-sm text-muted">
+            {run?.total ? `${run.progress} de ${run.total} piezas` : "Gemini está escribiendo los textos; puede tardar uno o dos minutos."}
+          </p>
+        </section>
+      )}
+
+      {failed && (
+        <section className="mb-12 border-[1.5px] border-orange bg-surface p-6">
+          <p className="font-medium">La generación falló</p>
+          <p className="mt-2 font-mono text-sm text-muted">{run?.error}</p>
+          <form action={rewriteCopyAction.bind(null, event.id)} className="mt-4">
+            <button className="btn-ink">Reintentar</button>
+          </form>
+        </section>
+      )}
+
+      {!running && run?.status === "done" && (
+        <p className="mb-10 font-hand text-xl leading-snug text-muted">
+          {run.stage}
+          {event.contentSource === "fallback" && " · Gemini no respondió: se usaron textos base."}
+          {event.contentSource === "fallback" && run.error && <span className="mt-1 block font-mono text-xs not-italic">{run.error}</span>}
+          {(event.roster as { source?: string } | null)?.source === "mock" && (
+            <span className="mt-1 block">Las credenciales y certificados usan una nómina de ejemplo (nombres ficticios).</span>
+          )}
+        </p>
+      )}
+
+      {!running && <Gallery folder={event.id} />}
+    </>
+  );
+}
+
+async function Gallery({ folder }: { folder: string }) {
+  const groups = (await listPieces(folder)).filter((g) => g.files.length > 0);
+  if (!groups.length) return <p className="text-muted">Todavía no hay piezas.</p>;
+  return (
+    <div className="space-y-16">
+      {groups.map((g) => (
+        <section key={g.id}>
+          <h2 className="mb-6 flex items-baseline gap-3">
+            <span className="boxed text-lg font-semibold">{g.title}</span>
+            <span className="label-mono text-muted">{g.files.filter((f) => !f.includes("/preview-")).length} archivos</span>
+          </h2>
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+            {g.files
+              .filter((f) => !f.includes("/preview-"))
+              .map((f) => (
+                <PieceCard key={f} path={f} />
+              ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+async function PieceCard({ path }: { path: string }) {
+  const name = path.split("/").pop()!;
+  const url = storageUrl(path);
+  let preview: React.ReactNode;
+  if (name.endsWith(".png")) {
+    // eslint-disable-next-line @next/next/no-img-element
+    preview = <img src={url} alt={name} loading="lazy" className="max-h-72 w-auto max-w-full object-contain" />;
+  } else if (name.endsWith(".txt")) {
+    preview = <pre className="max-h-72 overflow-auto whitespace-pre-wrap p-4 text-left font-sans text-sm leading-relaxed">{await readText(path)}</pre>;
+  } else if (name.endsWith(".html")) {
+    // eslint-disable-next-line @next/next/no-img-element
+    preview = <img src={url.replace("index.html", "preview-desktop.png")} alt="Landing" loading="lazy" className="max-h-72 w-auto max-w-full object-contain object-top" />;
+  } else {
+    preview = <span className="font-hand text-2xl text-muted">PDF para imprimir</span>;
+  }
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="group block border-[1.5px] border-ink bg-surface p-2 shadow-sm transition hover:-translate-y-0.5 hover:shadow-[5px_5px_0_var(--yellow)]"
+    >
+      <div className="flex min-h-48 items-center justify-center overflow-hidden bg-[#ecebe5]">{preview}</div>
+      <p className="truncate px-1 pb-1 pt-2.5 font-mono text-xs text-muted group-hover:text-ink">{name}</p>
+    </a>
+  );
+}

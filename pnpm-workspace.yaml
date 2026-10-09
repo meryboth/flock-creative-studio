@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+  - tools
+
+allowBuilds:
+  sharp: true
+  esbuild: true
+  onnxruntime-node: true
+  unrs-resolver: false

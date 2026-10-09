@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "corepack pnpm --filter @flock/templates build && corepack pnpm --parallel --filter @flock/templates --filter @flock/web dev"],
+      "port": 3000
+    }
+  ]
+}

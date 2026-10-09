@@ -1,0 +1,43 @@
+{
+  "linkedin": [
+    {
+      "id": "save-the-date",
+      "headline": "AI Day 2026",
+      "body": "Una jornada para aprender, experimentar y evolucionar juntos en la adopción de IA.",
+      "post": "🚀 Se viene el AI Day 2026 de Flock.\n\nEl 9 de octubre nos juntamos para aprender, experimentar y evolucionar juntos en la adopción de inteligencia artificial: charlas de nuestros teams, workshops prácticos y una hackathon express.\n\n¡Agendalo! 📅\n\n#FLOCKAIDAY #InteligenciaArtificial #Flock"
+    },
+    {
+      "id": "agenda",
+      "headline": "Charlas, workshops y hackathon",
+      "body": "Del kick-off a las demos de cierre: 7 bloques para aprender haciendo.",
+      "post": "📋 Este es el cronograma del AI Day 2026.\n\n9:15 Kick-off\n9:45 Charlas por teams\n11:00 Workshops prácticos\n13:30 Hackathon express\n15:00 Demos y cierre\n\n¿Con cuál arrancás? 👇\n\n#FLOCKAIDAY"
+    },
+    {
+      "id": "gracias",
+      "headline": "Learn · Experiment · Evolve",
+      "body": "Gracias a todos los que hicieron posible el AI Day 2026.",
+      "post": "💜 ¡Gracias a todos los flockers que fueron parte del AI Day 2026!\n\nAprendimos, experimentamos y nos llevamos un montón de ideas para seguir evolucionando juntos.\n\n#FLOCKAIDAY #LearnExperimentEvolve"
+    }
+  ],
+  "landing": {
+    "intro": "El AI Day es nuestra jornada anual para poner la inteligencia artificial en práctica. Charlas de los propios teams, workshops con casos reales y una hackathon express para llevarnos ideas que podamos aplicar desde el lunes.",
+    "highlights": [
+      {
+        "title": "Learn",
+        "text": "Charlas cortas de los teams sobre cómo ya usan IA en sus proyectos."
+      },
+      {
+        "title": "Experiment",
+        "text": "Workshops prácticos y una hackathon express para probar herramientas."
+      },
+      {
+        "title": "Evolve together",
+        "text": "Demos de cierre y próximos pasos para adoptar IA como equipo."
+      }
+    ],
+    "cta": {
+      "label": "Ver cronograma",
+      "href": "#agenda"
+    }
+  }
+}
