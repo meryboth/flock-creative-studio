@@ -84,7 +84,7 @@ export function GenerationProgress({ stage, progress, total, startedAt }: { stag
     <ProcessSteps
       steps={[
         { label: "Preparando el evento", detail: s.startsWith("Leyendo") ? "leyendo la nómina" : undefined },
-        { label: "Redactando los textos con Gemini" },
+        { label: "Redactando los textos con IA" },
         { label: "Generando las piezas", detail: total ? `${progress} de ${total} · ${s.replace(/^Generando: /, "")}` : undefined },
         { label: "Revisión de diseño" },
       ]}

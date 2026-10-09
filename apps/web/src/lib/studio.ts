@@ -135,12 +135,12 @@ export async function runGeneration(eventId: string, { rewriteCopy = true } = {}
     let lastCopyError: string | null = null;
     // Eventos anteriores a Slack y a los momentos (antes / durante / después): se redactan de nuevo
     if (rewriteCopy || !content || !content.slack) {
-      await update({ stage: "Redactando los textos con Gemini" });
+      await update({ stage: "Redactando los textos con IA" });
       const copy = await writeEventCopy({ event: kit.event, agenda });
-      if (copy.error) console.warn(`[gemini] ${copy.source}: ${copy.error}`);
+      if (copy.error) console.warn(`[textos] ${copy.source}: ${copy.error}`);
       lastCopyError = copy.error ?? null;
       content = copy.content;
-      await db.update(schema.events).set({ content, contentSource: copy.source, hashtag: kit.event.hashtag }).where(eq(schema.events.id, eventId));
+      await db.update(schema.events).set({ content, contentSource: copy.source === "llm" ? (copy.model ?? "llm") : "fallback", hashtag: kit.event.hashtag }).where(eq(schema.events.id, eventId));
     }
 
     await update({ stage: "Generando las piezas" });

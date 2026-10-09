@@ -1,6 +1,6 @@
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { FONT_CATALOG } from "@flock/templates";
 import { z } from "zod";
+import { invokeStructured } from "./llm";
 
 const HEX = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const FONTS = Object.keys(FONT_CATALOG) as [string, ...string[]];
@@ -48,20 +48,12 @@ export type EditContext = {
 
 /** Traduce un pedido en lenguaje natural a operaciones sobre las piezas (vocabulario cerrado). */
 export async function interpretEdit(ctx: EditContext): Promise<ChangeSetProposal> {
-  const apiKey = process.env.GOOGLE_API_KEY;
-  if (!apiKey) throw new Error("GOOGLE_API_KEY no configurada");
-  const models = (process.env.GEMINI_MODELS ?? "gemini-3.5-flash,gemini-flash-latest").split(",").map((m) => m.trim()).filter(Boolean);
-  const errors: string[] = [];
-  for (const model of models) {
-    try {
-      const llm = new ChatGoogleGenerativeAI({ model, apiKey, temperature: 0.2, maxRetries: 1 });
-      const out = await llm.withStructuredOutput(ChangeSetSchema, { name: "change_set" }).invoke(prompt(ctx), { signal: AbortSignal.timeout(45_000) });
-      return { ...out, operations: out.operations.filter(valid), model };
-    } catch (err) {
-      errors.push(`${model}: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
-    }
+  try {
+    const { out, model } = await invokeStructured("text", ChangeSetSchema, prompt(ctx), { name: "change_set", temperature: 0.2, timeoutMs: 45_000 });
+    return { ...out, operations: out.operations.filter(valid), model };
+  } catch (err) {
+    throw new Error(`No se pudo interpretar el pedido (${err instanceof Error ? err.message : String(err)})`);
   }
-  throw new Error(`No se pudo interpretar el pedido (${errors.join(" | ")})`);
 }
 
 // Descarta operaciones incompletas o fuera de rango (el modelo propone, el código valida)

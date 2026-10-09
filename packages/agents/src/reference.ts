@@ -1,9 +1,9 @@
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { HumanMessage } from "@langchain/core/messages";
 import type { ReferenceStyle } from "@flock/templates";
 import sharp from "sharp";
 import { z } from "zod";
 import { converter } from "culori";
+import { invokeStructured } from "./llm";
 import { analyzeMoodboard } from "./moodboard";
 
 const toOklch = converter("oklch");
@@ -111,10 +111,6 @@ Indicá también si las esquinas son rectas, suaves o redondas, si el fondo es p
 
 /** Lee una o más imágenes de referencia y las traduce a un estilo del sistema. */
 export async function analyzeReference(files: string[]): Promise<ReferenceAnalysis> {
-  const apiKey = process.env.GOOGLE_API_KEY;
-  if (!apiKey) throw new Error("GOOGLE_API_KEY no configurada");
-  const models = (process.env.GEMINI_VISION_MODELS ?? "gemini-3.5-flash,gemini-3.1-flash-lite").split(",").map((m) => m.trim()).filter(Boolean);
-
   const measured = await analyzeMoodboard(files);
   // Imágenes livianas: el modelo no necesita más de 1024 px para leer un estilo
   const images = await Promise.all(
@@ -124,20 +120,15 @@ export async function analyzeReference(files: string[]): Promise<ReferenceAnalys
     content: [{ type: "text", text: PROMPT(measured.colors, measured.background) }, ...images.map((url) => ({ type: "image_url" as const, image_url: url }))],
   });
 
-  const errors: string[] = [];
-  for (const model of models) {
-    try {
-      // Temperatura baja: la misma referencia tiene que dar (casi) la misma lectura
-      const llm = new ChatGoogleGenerativeAI({ model, apiKey, temperature: 0.15, maxRetries: 1 });
-      const out = await llm.withStructuredOutput(ReferenceSchema, { name: "reference_style" }).invoke([message], { signal: AbortSignal.timeout(60_000) });
-      const { keyVisualPrompt, medium, elements, ...style } = out;
-      // Un texto muy oscuro y casi sin color es negro en la referencia (el extractor lo confunde con sombras)
-      const ink = toOklch(style.colors.ink);
-      if (ink && ink.l < 0.42 && (ink.c ?? 0) < 0.07) style.colors.ink = "#111111";
-      return { style, keyVisualPrompt, medium, elements, model, extractedColors: measured.colors };
-    } catch (err) {
-      errors.push(`${model}: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
-    }
+  try {
+    // Temperatura baja: la misma referencia tiene que dar (casi) la misma lectura
+    const { out, model } = await invokeStructured("vision", ReferenceSchema, [message], { name: "reference_style", temperature: 0.15, timeoutMs: 60_000 });
+    const { keyVisualPrompt, medium, elements, ...style } = out;
+    // Un texto muy oscuro y casi sin color es negro en la referencia (el extractor lo confunde con sombras)
+    const ink = toOklch(style.colors.ink);
+    if (ink && ink.l < 0.42 && (ink.c ?? 0) < 0.07) style.colors.ink = "#111111";
+    return { style, keyVisualPrompt, medium, elements, model, extractedColors: measured.colors };
+  } catch (err) {
+    throw new Error(`No se pudo analizar la referencia (${err instanceof Error ? err.message : String(err)})`);
   }
-  throw new Error(`No se pudo analizar la referencia (${errors.join(" | ")})`);
 }

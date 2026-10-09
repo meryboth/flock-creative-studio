@@ -1,6 +1,6 @@
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import type { AgendaItem, EventContent, EventInfo, Moment } from "@flock/templates";
 import { z } from "zod";
+import { invokeStructured, providers } from "./llm";
 
 const ContentSchema = z.object({
   linkedin: z
@@ -33,30 +33,20 @@ const ContentSchema = z.object({
 });
 
 export type CopyInput = { event: EventInfo; agenda: AgendaItem[] };
-export type CopyResult = { content: EventContent; source: "gemini" | "fallback"; model?: string; error?: string };
+export type CopyResult = { content: EventContent; source: "llm" | "fallback"; model?: string; error?: string };
 
 /**
- * Redacta los textos del evento con Gemini (salida estructurada).
- * Prueba los modelos de GEMINI_MODELS en orden; si ninguno responde, usa textos base.
+ * Redacta los textos del evento con el LLM configurado (Claude o Gemini, salida estructurada).
+ * Prueba proveedores y modelos en orden; si ninguno responde, usa textos base.
  */
 export async function writeEventCopy(input: CopyInput): Promise<CopyResult> {
-  const apiKey = process.env.GOOGLE_API_KEY;
-  const models = (process.env.GEMINI_MODELS ?? "gemini-3.5-flash,gemini-flash-latest").split(",").map((m) => m.trim()).filter(Boolean);
-  if (!apiKey) return { content: fallbackCopy(input), source: "fallback", error: "GOOGLE_API_KEY no configurada" };
-
-  const errors: string[] = [];
-  for (const model of models) {
-    try {
-      const llm = new ChatGoogleGenerativeAI({ model, apiKey, temperature: 0.7, maxRetries: 1 });
-      const out = await llm.withStructuredOutput(ContentSchema, { name: "event_copy" }).invoke(prompt(input), {
-        signal: AbortSignal.timeout(90_000),
-      });
-      return { content: toContent(out), source: "gemini", model };
-    } catch (err) {
-      errors.push(`${model}: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
-    }
+  if (!providers().length) return { content: fallbackCopy(input), source: "fallback", error: "No hay proveedor de LLM configurado" };
+  try {
+    const { out, model } = await invokeStructured("text", ContentSchema, prompt(input), { name: "event_copy", temperature: 0.7, timeoutMs: 90_000 });
+    return { content: toContent(out), source: "llm", model };
+  } catch (err) {
+    return { content: fallbackCopy(input), source: "fallback", error: err instanceof Error ? err.message : String(err) };
   }
-  return { content: fallbackCopy(input), source: "fallback", error: errors.join(" | ") };
 }
 
 function prompt({ event, agenda }: CopyInput) {

@@ -100,7 +100,7 @@ export async function createEventAction(_prev: FormState, form: FormData): Promi
   }
   if (graphics.keyVisual || graphics.elements) await setEventGraphics(id, graphics);
 
-  // La generación (Gemini + render) tarda: corre después de responder y la página muestra el progreso
+  // La generación (LLM + render) tarda: corre después de responder y la página muestra el progreso
   after(() => runGeneration(id));
   redirect(`/eventos/${id}`);
 }

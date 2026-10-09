@@ -20,3 +20,4 @@ Bitácora de lo que se fue implementando en **Flock Creative Studio** (antes "Fl
 | 10 | [Fidelidad a la referencia e indicadores de progreso](10-fidelidad-y-progreso.md) | 2026-10-09 |
 | 11 | [Editor conversacional](11-editor-conversacional.md) | 2026-10-09 |
 | 12 | [Accionables por pieza: publicar, descargar, sincronizar](12-accionables.md) | 2026-10-09 |
+| 13 | [Claude como proveedor y calendario](13-claude-y-calendario.md) | 2026-10-09 |

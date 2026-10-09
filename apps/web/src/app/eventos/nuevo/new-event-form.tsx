@@ -161,7 +161,7 @@ export function NewEventForm({ styles, library, initialLibraryId }: { styles: St
           <Field label="Lugar" hint="Opcional">
             <input name="location" value={fields.location} onChange={set("location")} placeholder="Oficinas Flock + Teams" className={input} />
           </Field>
-          <Field label="¿De qué se trata?" hint="Una o dos frases. Gemini las usa para escribir los posteos y la landing.">
+          <Field label="¿De qué se trata?" hint="Una o dos frases. La IA las usa para escribir los posteos y la landing.">
             <textarea
               name="description"
               rows={3}
@@ -325,7 +325,7 @@ export function NewEventForm({ styles, library, initialLibraryId }: { styles: St
           >
             {pending ? "Creando…" : "Generar las piezas"}
           </button>
-          <p className="font-hand text-xl text-muted">los textos los escribe Gemini; tarda un par de minutos</p>
+          <p className="font-hand text-xl text-muted">los textos los escribe la IA (Claude o Gemini); tarda un par de minutos</p>
           {state.error && !state.field && <p className="w-full text-sm text-orange">{state.error}</p>}
         </div>
       </div>
@@ -352,7 +352,7 @@ export function NewEventForm({ styles, library, initialLibraryId }: { styles: St
         <div className={`taped mx-auto rotate-[0.4deg] border-[1.5px] border-ink bg-surface p-2 shadow-lg ${piece === "badge" ? "max-w-[300px]" : ""}`}>
           <PreviewFrame src={previewUrl(styleId, piece)} width={currentPiece.width} height={currentPiece.height} title={`Vista previa: ${currentPiece.label}`} />
         </div>
-        <p className="mt-3 text-sm text-muted">Vista previa con textos de ejemplo. Las piezas finales usan los textos que escriba Gemini.</p>
+        <p className="mt-3 text-sm text-muted">Vista previa con textos de ejemplo. Las piezas finales usan los textos que escriba la IA.</p>
       </aside>
     </form>
   );

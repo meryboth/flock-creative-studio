@@ -63,7 +63,7 @@ export const events = pgTable("events", {
   style: jsonb("style"),
   moodboard: jsonb("moodboard"), // análisis del moodboard (colores, estilo sugerido)
   content: jsonb("content"), // textos generados (EventContent)
-  contentSource: text("content_source"), // gemini | fallback
+  contentSource: text("content_source"), // modelo que redactó ("claude:claude-sonnet-5-5") o "fallback"
   // De dónde salió la nómina de este evento y cuándo se leyó: { source, fetchedAt }
   roster: jsonb("roster"),
   // Cambios pedidos en el editor conversacional (Overrides de @flock/studio)

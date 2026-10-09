@@ -16,7 +16,7 @@ export async function newVariantAction(eventId: string) {
   revalidatePath(`/eventos/${eventId}`);
 }
 
-/** Vuelve a pedirle los textos a Gemini y regenera. */
+/** Vuelve a pedirle los textos al LLM y regenera. */
 export async function rewriteCopyAction(eventId: string) {
   await db.update(schema.events).set({ status: "producing" }).where(eq(schema.events.id, eventId));
   after(() => runGeneration(eventId, { rewriteCopy: true }));

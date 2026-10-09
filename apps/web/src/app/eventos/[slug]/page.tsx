@@ -100,7 +100,8 @@ async function EventContent({ params }: { params: PageProps<"/eventos/[slug]">["
       {!running && run?.status === "done" && (
         <p className="mb-10 font-hand text-xl leading-snug text-muted">
           {run.stage}
-          {event.contentSource === "fallback" && " · Gemini no respondió: se usaron textos base."}
+          {event.contentSource && event.contentSource !== "fallback" && ` · textos: ${event.contentSource.split(":").pop()}`}
+          {event.contentSource === "fallback" && " · La IA no respondió: se usaron textos base."}
           {event.contentSource === "fallback" && run.error && <span className="mt-1 block font-mono text-xs not-italic">{run.error}</span>}
           {(event.roster as { source?: string } | null)?.source === "mock" && (
             <span className="mt-1 block">Las credenciales y certificados usan una nómina de ejemplo (nombres ficticios).</span>
