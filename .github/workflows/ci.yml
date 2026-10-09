@@ -35,6 +35,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Paquete de plantillas
         run: pnpm --filter @flock/templates build
+      - name: Tipos de rutas de Next (PageProps, RouteContext)
+        run: pnpm --filter @flock/web exec next typegen
       - name: Tipos
         run: |
           for p in packages/templates packages/agents packages/studio packages/renderer packages/db apps/web tools; do
