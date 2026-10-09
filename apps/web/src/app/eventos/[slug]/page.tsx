@@ -1,14 +1,17 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { STYLES } from "@flock/templates";
+import { MOMENT_LABEL, momentOf, STYLES, type EventContent } from "@flock/templates";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { GenerationProgress } from "@/components/progress-views";
+import { PublishPlanner } from "@/components/publish-planner";
+import { CredentialsActions } from "@/components/roster-sync";
 import { Studio, type StudioGroup, type StudioHistoryItem } from "@/components/studio";
+import { connectorStatus, publishingPlan, type Channel } from "@/lib/schedule";
 import { describeOperation, listChanges } from "@/lib/editor";
 import { listPieces, readText, storageUrl } from "@/lib/pieces";
 import type { EditOperation } from "@flock/agents";
 import type { schema } from "@flock/db";
-import { getEvent, type StyleChoice } from "@/lib/studio";
+import { getEvent, lastRosterUrl, type RosterInfo, type StyleChoice } from "@/lib/studio";
 import { newVariantAction, rewriteCopyAction } from "./actions";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -69,6 +72,9 @@ async function EventContent({ params }: { params: PageProps<"/eventos/[slug]">["
             <form action={rewriteCopyAction.bind(null, event.id)}>
               <button className="btn-line">Reescribir textos</button>
             </form>
+            <a href={`/api/eventos/${event.id}/descargar`} className="btn-ink" download>
+              Descargar todo (.zip)
+            </a>
           </div>
         )}
       </header>
@@ -102,13 +108,14 @@ async function EventContent({ params }: { params: PageProps<"/eventos/[slug]">["
         </p>
       )}
 
-      <StudioSection eventId={event.id} pieces={pieces} running={running} />
+      <StudioSection event={event} pieces={pieces} running={running} />
     </>
   );
 }
 
 const GROUP_TITLES: { id: string; title: string }[] = [
   { id: "linkedin", title: "LinkedIn" },
+  { id: "slack", title: "Slack" },
   { id: "cronograma", title: "Cronograma" },
   { id: "credenciales", title: "Credenciales" },
   { id: "certificados", title: "Certificados" },
@@ -118,8 +125,12 @@ const GROUP_TITLES: { id: string; title: string }[] = [
 type PieceRow = typeof schema.pieces.$inferSelect;
 
 /** Galería seleccionable + chat de edición. */
-async function StudioSection({ eventId, pieces, running }: { eventId: string; pieces: PieceRow[]; running: boolean }) {
+type EventRow = typeof schema.events.$inferSelect;
+
+async function StudioSection({ event, pieces, running }: { event: EventRow; pieces: PieceRow[]; running: boolean }) {
+  const eventId = event.id;
   if (!pieces.length) return running ? null : <p className="text-muted">Todavía no hay piezas.</p>;
+  const badges = momentBadges(event.content as EventContent | null);
   // Versión de las piezas: cambia cuando termina una regeneración (rompe la caché del navegador)
   const v = Math.max(...pieces.map((p) => p.createdAt.getTime()));
   const label = new Map(pieces.map((p) => [p.file, (p.data as { label?: string }).label ?? p.file!]));
@@ -140,6 +151,7 @@ async function StudioSection({ eventId, pieces, running }: { eventId: string; pi
               label: label.get(file) ?? file,
               text: kind === "txt" ? await readText(`${eventId}/${file}`).catch(() => "") : undefined,
               previewUrl: kind === "html" ? url.replace("index.html", "preview-desktop.png") : undefined,
+              badge: badges.get(file.replace(/-(square|landscape)\.png$|\.(png|txt)$/, "")),
             };
           }),
       ),
@@ -153,7 +165,56 @@ async function StudioSection({ eventId, pieces, running }: { eventId: string; pi
     status: c.status,
     pieceLabel: c.pieceFile ? label.get(c.pieceFile) : undefined,
   }));
-  return <Studio eventId={eventId} groups={groups.filter((g) => g.pieces.length)} history={history} running={running} />;
+  const toolbars: Record<string, React.ReactNode> = {
+    linkedin: <Planner eventId={eventId} channel="linkedin" v={v} />,
+    slack: <Planner eventId={eventId} channel="slack" v={v} />,
+    credenciales: <CredentialsActions eventId={eventId} roster={event.roster as RosterInfo | null} suggestedUrl={await lastRosterUrl()} />,
+  };
+  return (
+    <Studio
+      eventId={eventId}
+      groups={groups.filter((g) => g.pieces.length).map((g) => ({ ...g, toolbar: running ? null : toolbars[g.id] }))}
+      history={history}
+      running={running}
+    />
+  );
+}
+
+/** "Se viene" / "En vivo" / "Después" para las piezas de LinkedIn y Slack (clave: ruta sin formato ni extensión). */
+function momentBadges(content: EventContent | null) {
+  const map = new Map<string, string>();
+  for (const p of content?.linkedin ?? []) map.set(`linkedin/${p.id}`, MOMENT_LABEL[momentOf(p)]);
+  for (const m of content?.slack ?? []) map.set(`slack/${m.id}`, MOMENT_LABEL[m.moment]);
+  return map;
+}
+
+async function Planner({ eventId, channel, v }: { eventId: string; channel: Channel; v: number }) {
+  const [plan, status] = await Promise.all([publishingPlan(eventId, channel), connectorStatus()]);
+  if (!plan.length) return null;
+  const items = plan.map((p) => ({
+    moment: p.moment,
+    headline: p.headline,
+    text: p.text,
+    imageUrl: `${storageUrl(`${eventId}/${p.pieceFile}`)}?v=${v}`,
+    suggestedAt: p.suggestedAt,
+    scheduled: p.scheduled && {
+      id: p.scheduled.id,
+      status: p.scheduled.status,
+      scheduledAt: p.scheduled.scheduledAt.toISOString(),
+      externalUrl: p.scheduled.externalUrl,
+      error: p.scheduled.error,
+      target: p.scheduled.target,
+    },
+  }));
+  return (
+    <PublishPlanner
+      eventId={eventId}
+      channel={channel}
+      items={items}
+      connected={status[channel].connected}
+      defaultTarget={channel === "slack" ? status.slack.defaultChannel : null}
+    />
+  );
 }
 
 async function Gallery({ folder }: { folder: string }) {

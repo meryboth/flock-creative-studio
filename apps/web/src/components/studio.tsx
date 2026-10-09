@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { PixelLoader } from "./processing";
 
-export type StudioPiece = { file: string; url: string; kind: "png" | "txt" | "html" | "pdf"; label: string; text?: string; previewUrl?: string };
-export type StudioGroup = { id: string; title: string; pieces: StudioPiece[] };
+export type StudioPiece = { file: string; url: string; kind: "png" | "txt" | "html" | "pdf"; label: string; text?: string; previewUrl?: string; badge?: string };
+// toolbar: accionables del grupo (programar publicaciones, descargar, sincronizar nómina)
+export type StudioGroup = { id: string; title: string; pieces: StudioPiece[]; toolbar?: React.ReactNode };
 export type StudioHistoryItem = { id: string; message: string; reply: string | null; operations: string[]; status: string; pieceLabel?: string };
 
 type Scope = { kind: "all" } | { kind: "group"; group: string } | { kind: "piece"; file: string };
@@ -110,6 +111,7 @@ export function Studio({ eventId, groups, history, running }: { eventId: string;
               <span className="boxed text-lg font-semibold">{g.title}</span>
               <span className="label-mono text-muted">{g.pieces.length} archivos</span>
             </h2>
+            {g.toolbar}
             <div className="grid gap-7 sm:grid-cols-2 xl:grid-cols-3">
               {g.pieces.map((p) => {
                 const isSelected = selected?.file === p.file;
@@ -139,7 +141,10 @@ export function Studio({ eventId, groups, history, running }: { eventId: string;
                       </div>
                     </button>
                     <div className="flex items-center justify-between gap-2 px-1 pb-1 pt-2.5">
-                      <span className="truncate font-mono text-xs text-muted">{p.file.split("/").pop()}</span>
+                      <span className="flex min-w-0 items-center gap-2">
+                        {p.badge && <span className="sticker shrink-0 bg-mint text-[11px]">{p.badge}</span>}
+                        <span className="truncate font-mono text-xs text-muted">{p.file.split("/").pop()}</span>
+                      </span>
                       <span className="flex shrink-0 items-center gap-2">
                         {isSelected && <span className="sticker bg-yellow text-[11px]">elegida</span>}
                         <a href={p.url} target="_blank" rel="noreferrer" className="label-mono text-muted underline underline-offset-4 hover:text-ink">

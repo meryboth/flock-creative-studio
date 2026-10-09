@@ -16,6 +16,7 @@
     "@flock/templates": "workspace:*",
     "@imgly/background-removal-node": "^1.4.5",
     "drizzle-orm": "^0.45.4",
+    "fflate": "0.8.2",
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",

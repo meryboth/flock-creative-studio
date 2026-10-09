@@ -15,7 +15,7 @@ const Operation = z.object({
     "setVisualScale", // number: 0.4–1.8 (1 = actual)
     "hide", // element
     "show", // element
-    "setCopy", // field + text (solo posteos de LinkedIn)
+    "setCopy", // field + text (solo posteos de LinkedIn y mensajes de Slack)
     "newVariant", // otra composición del visual
     "regenerateKeyVisual", // prompt (en inglés)
   ]),
@@ -107,7 +107,7 @@ Operaciones disponibles:
 - setTitleScale: number, multiplicador del tamaño del título (1 = actual; "más grande" ≈ 1.2, "mucho más grande" ≈ 1.4, "más chico" ≈ 0.8).
 - setVisualScale: number, multiplicador del tamaño del visual (flor, objeto, formas): "más chico" ≈ 0.7, "más grande" ≈ 1.3.
 - hide / show: element hashtag | tagline (frase) | date (fecha) | visual. El logo de Flock NO se puede ocultar ni modificar.
-- setCopy: field headline | body, text el texto nuevo. Solo para posteos de LinkedIn y solo si hay una pieza de LinkedIn elegida.
+- setCopy: field headline | body, text el texto nuevo. Solo para posteos de LinkedIn o mensajes de Slack, y solo si hay una de esas piezas elegida.
 - newVariant: otra composición del visual (misma estética).
 - regenerateKeyVisual: prompt en inglés para un key visual nuevo (técnica + sujeto, sin texto ni logos). ${c.canRegenerateGraphics ? "Disponible." : "NO disponible para este estilo: decilo si lo piden."}
 

@@ -61,7 +61,13 @@ function kitOf(event: typeof schema.events.$inferSelect) {
   });
 }
 
-const postIdOf = (file: string) => file.match(/^linkedin\/(.+)-(square|landscape)\.png$/)?.[1] ?? null;
+/** Posteo o mensaje cuyo texto se puede editar desde la pieza elegida. */
+function copyTargetOf(file: string): { channel: "linkedin" | "slack"; id: string } | null {
+  const li = file.match(/^linkedin\/(.+)-(square|landscape)\.png$/);
+  if (li) return { channel: "linkedin", id: li[1] };
+  const sl = file.match(/^slack\/(.+)\.png$/);
+  return sl ? { channel: "slack", id: sl[1] } : null;
+}
 
 /** Opciones de alcance para la pieza elegida, con la cantidad de piezas afectadas. */
 export async function scopeOptions(eventId: string, pieceFile: string | null) {
@@ -85,8 +91,8 @@ export async function proposeChange(eventId: string, message: string, pieceFile:
   const [piece] = pieceFile
     ? await db.select().from(schema.pieces).where(and(eq(schema.pieces.eventId, eventId), eq(schema.pieces.file, pieceFile)))
     : [];
-  const postId = piece ? postIdOf(piece.file!) : null;
-  const post = postId ? (event.content as EventContent | null)?.linkedin.find((p) => p.id === postId) : undefined;
+  const target = piece ? copyTargetOf(piece.file!) : null;
+  const post = target ? (event.content as EventContent | null)?.[target.channel]?.find((p) => p.id === target.id) : undefined;
 
   const proposal = await interpretEdit({
     message,
@@ -98,8 +104,8 @@ export async function proposeChange(eventId: string, message: string, pieceFile:
       : null,
     canRegenerateGraphics: Boolean(style.reference),
   });
-  // setCopy solo tiene sentido sobre un posteo elegido
-  const operations = proposal.operations.filter((o) => o.op !== "setCopy" || postId);
+  // setCopy solo tiene sentido sobre un posteo o mensaje elegido
+  const operations = proposal.operations.filter((o) => o.op !== "setCopy" || post);
 
   const [row] = await db
     .insert(schema.changeSets)
@@ -139,11 +145,12 @@ export async function applyChange(changeId: string, scope: Scope) {
   }
   if (Object.keys(patch).length) overrides = addPatch(overrides, patch, scope);
 
-  // Textos: se editan en el contenido del posteo elegido
-  const postId = change.pieceFile ? postIdOf(change.pieceFile) : null;
+  // Textos: se editan en el contenido del posteo o mensaje elegido
+  const target = change.pieceFile ? copyTargetOf(change.pieceFile) : null;
   for (const o of ops.filter((x) => x.op === "setCopy")) {
-    if (!content || !postId) continue;
-    content = { ...content, linkedin: content.linkedin.map((p) => (p.id === postId ? { ...p, [o.field!]: o.text! } : p)) };
+    if (!content || !target) continue;
+    const edit = <T extends { id: string }>(list: T[] = []) => list.map((p) => (p.id === target.id ? { ...p, [o.field!]: o.text! } : p));
+    content = target.channel === "linkedin" ? { ...content, linkedin: edit(content.linkedin) } : { ...content, slack: edit(content.slack) };
   }
 
   // Acciones sobre el estilo del evento

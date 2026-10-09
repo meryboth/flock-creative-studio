@@ -35,6 +35,9 @@ La app y la CLI funcionan sin ellos: el evento de ejemplo se genera sin imagen p
 - **Estilos:** armar una biblioteca de estilos del equipo a partir de piezas de referencia, ver cómo se aplican y borrarlos.
 - **Referencia gráfica:** subir una imagen y que el sistema lea su esencia (Gemini con visión) para proponer un estilo.
 - **Key visual:** generar un objeto original inspirado en la referencia (ComfyUI local o Gemini).
+- **Editor conversacional:** elegir una pieza, pedir cambios en lenguaje natural y aplicarlos a todas, a su grupo o solo a esa. Se pueden deshacer.
+- **LinkedIn y Slack por momentos:** piezas para antes, durante y después del evento, con programación de publicaciones (conectores en `.env`: ver `.env.example`).
+- **Credenciales:** descargarlas todas en .zip y sincronizarlas con la nómina (Excel en SharePoint).
 
 ## Generación de key visuals con ComfyUI
 

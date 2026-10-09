@@ -115,7 +115,20 @@ export type PieceOptions = {
 
 export type RenderContext = { kit: EventKit; assets: ResolvedAssets; options?: PieceOptions };
 
-export type LinkedInPost = { id: string; headline: string; body?: string; post: string };
+/** Momento de la comunicación respecto del evento: se viene, está pasando, ya pasó. */
+export type Moment = "antes" | "durante" | "despues";
+export const MOMENTS: Moment[] = ["antes", "durante", "despues"];
+export const MOMENT_LABEL: Record<Moment, string> = { antes: "Se viene", durante: "En vivo", despues: "Después" };
+
+export type LinkedInPost = { id: string; moment?: Moment; headline: string; body?: string; post: string };
+/** Mensaje para un canal interno de Slack: imagen + texto. */
+export type SlackMessage = { id: string; moment: Moment; headline: string; body?: string; text: string };
+
+/** Momento de un posteo (los eventos anteriores no lo guardaban: se deduce del id). */
+export function momentOf(post: { id: string; moment?: Moment }): Moment {
+  if (post.moment) return post.moment;
+  return ({ agenda: "durante", "en-vivo": "durante", gracias: "despues" } as Record<string, Moment>)[post.id] ?? "antes";
+}
 
 export type LandingContent = {
   intro: string;
@@ -123,4 +136,4 @@ export type LandingContent = {
   cta?: { label: string; href: string };
 };
 
-export type EventContent = { linkedin: LinkedInPost[]; landing: LandingContent };
+export type EventContent = { linkedin: LinkedInPost[]; slack?: SlackMessage[]; landing: LandingContent };

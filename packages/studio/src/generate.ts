@@ -23,7 +23,7 @@ import {
   type ResolvedAssets,
 } from "@flock/templates";
 
-export type PieceType = "linkedin" | "linkedin-text" | "agenda-slide" | "agenda-summary" | "badge" | "badge-sheet" | "certificate" | "landing";
+export type PieceType = "linkedin" | "linkedin-text" | "slack" | "slack-text" | "agenda-slide" | "agenda-summary" | "badge" | "badge-sheet" | "certificate" | "landing";
 
 export type GeneratedPiece = { type: PieceType; template: string; file: string; label: string };
 
@@ -78,7 +78,7 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
   const sample = (template: string, html: string) => (qaSamples.has(template) ? html : (qaSamples.set(template, html), html));
 
   const total =
-    content.linkedin.length * 3 + (agenda.length ? agenda.length + 1 : 0) + attendees.length * 2 + Math.ceil(attendees.length / 9) + 1;
+    content.linkedin.length * 3 + (content.slack?.length ?? 0) * 2 + (agenda.length ? agenda.length + 1 : 0) + attendees.length * 2 + Math.ceil(attendees.length / 9) + 1;
   let done = 0;
   const save = async (piece: Omit<GeneratedPiece, "file"> & { path: string }, data: Buffer | string) => {
     const file = join(outDir, piece.path);
@@ -100,6 +100,14 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
         );
       }
       await save({ type: "linkedin-text", template: "linkedin-text", label: `Texto: ${post.headline}`, path: `linkedin/${post.id}.txt` }, post.post);
+    }
+
+    // Slack: imagen apaisada (se lee bien en el canal) + el texto del mensaje
+    for (const msg of content.slack ?? []) {
+      const path = `slack/${msg.id}.png`;
+      const html = sample("slack", linkedinPost.render(await ctxFor(path, "slack"), { id: `slack-${msg.id}`, headline: msg.headline, body: msg.body, post: msg.text }, "landscape"));
+      await save({ type: "slack", template: "slack", label: `Slack: ${msg.headline}`, path }, await renderPng(html, linkedinPost.sizes.landscape));
+      await save({ type: "slack-text", template: "slack-text", label: `Mensaje: ${msg.headline}`, path: `slack/${msg.id}.txt` }, msg.text);
     }
 
     // Cronograma: una slide por bloque + resumen

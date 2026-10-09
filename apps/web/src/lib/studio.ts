@@ -133,7 +133,8 @@ export async function runGeneration(eventId: string, { rewriteCopy = true } = {}
 
     let content = event.content as EventContent | null;
     let lastCopyError: string | null = null;
-    if (rewriteCopy || !content) {
+    // Eventos anteriores a Slack y a los momentos (antes / durante / después): se redactan de nuevo
+    if (rewriteCopy || !content || !content.slack) {
       await update({ stage: "Redactando los textos con Gemini" });
       const copy = await writeEventCopy({ event: kit.event, agenda });
       if (copy.error) console.warn(`[gemini] ${copy.source}: ${copy.error}`);
@@ -185,4 +186,36 @@ export async function runGeneration(eventId: string, { rewriteCopy = true } = {}
 export async function setEventGraphics(eventId: string, graphics: { keyVisual?: string; elements?: string[] }) {
   const [event] = await db.select({ style: schema.events.style }).from(schema.events).where(eq(schema.events.id, eventId));
   await db.update(schema.events).set({ style: { ...(event.style as StyleChoice), ...graphics } }).where(eq(schema.events.id, eventId));
+}
+
+export type RosterInfo = { source: string; fetchedAt: string; url?: string; count?: number; error?: string };
+
+/**
+ * Sincroniza las credenciales con la nómina de SharePoint: reemplaza el snapshot de asistentes del evento.
+ * Devuelve la cantidad de personas; la regeneración de piezas la dispara quien llama.
+ */
+export async function syncRoster(eventId: string, url: string) {
+  const [event] = await db.select({ roster: schema.events.roster }).from(schema.events).where(eq(schema.events.id, eventId));
+  if (!event) throw new Error("Evento inexistente");
+  try {
+    const roster = await loadRoster({ kind: "sharepoint-excel", url }, REPO_ROOT);
+    await db.transaction(async (tx) => {
+      await tx.delete(schema.attendees).where(eq(schema.attendees.eventId, eventId));
+      await tx.insert(schema.attendees).values(roster.attendees.map((a) => ({ eventId, ...a })));
+      const info: RosterInfo = { source: roster.source, fetchedAt: roster.fetchedAt, url, count: roster.attendees.length };
+      await tx.update(schema.events).set({ roster: info, status: "producing" }).where(eq(schema.events.id, eventId));
+    });
+    return roster.attendees.length;
+  } catch (err) {
+    // Se recuerda el link aunque falle, para reintentar sin volver a pegarlo
+    const error = err instanceof Error ? err.message : String(err);
+    await db.update(schema.events).set({ roster: { ...(event.roster as RosterInfo | null), url, error } }).where(eq(schema.events.id, eventId));
+    throw new Error(error);
+  }
+}
+
+/** Último link de nómina usado en cualquier evento: se sugiere para los próximos. */
+export async function lastRosterUrl() {
+  const rows = await db.select({ roster: schema.events.roster }).from(schema.events).orderBy(desc(schema.events.createdAt)).limit(50);
+  return rows.map((r) => (r.roster as RosterInfo | null)?.url).find(Boolean) ?? null;
 }

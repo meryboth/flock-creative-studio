@@ -2,10 +2,11 @@ import { contrast, ensureContrast, type EventKit, type HideableElement, type Pie
 import type { PieceAdjust, PieceType } from "./generate";
 
 /** Grupos de piezas para el alcance "este tipo de pieza". */
-export type PieceGroup = "linkedin" | "agenda" | "badge" | "certificate" | "landing";
+export type PieceGroup = "linkedin" | "slack" | "agenda" | "badge" | "certificate" | "landing";
 
 export const GROUP_LABEL: Record<PieceGroup, string> = {
   linkedin: "posteos de LinkedIn",
+  slack: "mensajes de Slack",
   agenda: "cronograma",
   badge: "credenciales",
   certificate: "certificados",
@@ -14,6 +15,7 @@ export const GROUP_LABEL: Record<PieceGroup, string> = {
 
 export function groupOf(type: PieceType): PieceGroup {
   if (type === "linkedin" || type === "linkedin-text") return "linkedin";
+  if (type === "slack" || type === "slack-text") return "slack";
   if (type === "agenda-slide" || type === "agenda-summary") return "agenda";
   if (type === "badge" || type === "badge-sheet") return "badge";
   return type as PieceGroup;

@@ -1,15 +1,25 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import type { AgendaItem, EventContent, EventInfo } from "@flock/templates";
+import type { AgendaItem, EventContent, EventInfo, Moment } from "@flock/templates";
 import { z } from "zod";
 
 const ContentSchema = z.object({
   linkedin: z
     .array(
       z.object({
-        id: z.enum(["anuncio", "agenda", "gracias"]),
+        id: z.enum(["anuncio", "en-vivo", "gracias"]),
         headline: z.string().describe("Titular de la imagen: 2 a 5 palabras, sin hashtag ni emojis"),
         body: z.string().describe("Bajada de la imagen: una frase de 8 a 18 palabras"),
         post: z.string().describe("Texto completo del posteo de LinkedIn: 400 a 900 caracteres, párrafos cortos, hasta 3 emojis, termina con hashtags"),
+      }),
+    )
+    .length(3),
+  slack: z
+    .array(
+      z.object({
+        id: z.enum(["anuncio", "hoy", "gracias"]),
+        headline: z.string().describe("Titular de la imagen: 2 a 5 palabras, sin hashtag ni emojis"),
+        body: z.string().describe("Bajada de la imagen: una frase de 8 a 18 palabras"),
+        text: z.string().describe("Mensaje de Slack: 150 a 450 caracteres, directo, con *negritas* de Slack si suma, hasta 2 emojis, sin hashtags"),
       }),
     )
     .length(3),
@@ -69,13 +79,22 @@ Datos del evento (no inventes nada que no esté acá: ni speakers, ni cifras, ni
 ${agendaText}
 
 Escribí:
-1. Tres posteos de LinkedIn, en este orden e id: "anuncio" (save the date / invitación), "agenda" (cómo viene el día${agenda.length ? "" : "; si no hay agenda, contá qué se va a vivir sin inventar horarios"}) y "gracias" (agradecimiento después del evento). Cada uno con titular para la imagen, bajada y el texto del post. Todos terminan con ${event.hashtag} y como mucho otros 2 hashtags.
-2. Los textos de la landing: introducción, tres destacados (qué se va a vivir) y el texto del botón.`;
+1. Tres posteos de LinkedIn (públicos, cuentan el evento hacia afuera), uno por momento, en este orden e id:
+   - "anuncio": ANTES. Se viene el evento: qué es, cuándo y por qué importa.
+   - "en-vivo": DURANTE. Se publica el día del evento, en presente: qué se está viviendo${agenda.length ? " (podés nombrar bloques de la agenda)" : ", sin inventar horarios"}.
+   - "gracias": DESPUÉS. Balance y agradecimiento, en pasado, sin inventar resultados ni cifras.
+   Cada uno con titular para la imagen, bajada y el texto del post. Todos terminan con ${event.hashtag} y como mucho otros 2 hashtags.
+2. Tres mensajes para Slack interno (para flockers, más cortos y directos que LinkedIn), en este orden e id: "anuncio" (se viene: agendalo), "hoy" (es hoy: dónde y a qué hora arranca) y "gracias" (gracias por sumarte). Cada uno con titular, bajada y el texto del mensaje.
+3. Los textos de la landing: introducción, tres destacados (qué se va a vivir) y el texto del botón.`;
 }
+
+const LINKEDIN_MOMENT: Record<string, Moment> = { anuncio: "antes", "en-vivo": "durante", gracias: "despues" };
+const SLACK_MOMENT: Record<string, Moment> = { anuncio: "antes", hoy: "durante", gracias: "despues" };
 
 function toContent(out: z.infer<typeof ContentSchema>): EventContent {
   return {
-    linkedin: out.linkedin.map((p) => ({ id: p.id, headline: p.headline, body: p.body, post: p.post })),
+    linkedin: out.linkedin.map((p) => ({ id: p.id, moment: LINKEDIN_MOMENT[p.id], headline: p.headline, body: p.body, post: p.post })),
+    slack: out.slack.map((m) => ({ id: m.id, moment: SLACK_MOMENT[m.id], headline: m.headline, body: m.body, text: m.text })),
     landing: {
       intro: out.landing.intro,
       highlights: out.landing.highlights,
@@ -92,24 +111,37 @@ export function fallbackCopy({ event, agenda }: CopyInput): EventContent {
   return {
     linkedin: es
       ? [
-          { id: "anuncio", headline: event.name, body: desc, post: `📅 Agendalo: ${event.name}, el ${event.dateLabel}.\n\n${desc}\n\n${event.hashtag}` },
+          { id: "anuncio", moment: "antes", headline: event.name, body: desc, post: `📅 Agendalo: ${event.name}, el ${event.dateLabel}.\n\n${desc}\n\n${event.hashtag}` },
           {
-            id: "agenda",
-            headline: "Así viene el día",
+            id: "en-vivo",
+            moment: "durante",
+            headline: "Está pasando",
             body: agenda.length ? `${agenda.length} bloques para vivirlo de punta a punta.` : desc,
-            post: `Así viene ${event.name}:\n\n${firstItems || desc}\n\n${event.hashtag}`,
+            post: `Hoy es ${event.name} y así viene el día:\n\n${firstItems || desc}\n\n${event.hashtag}`,
           },
-          { id: "gracias", headline: "¡Gracias, flockers!", body: `Gracias por ser parte de ${event.name}.`, post: `💜 ¡Gracias a todos los que hicieron posible ${event.name}!\n\n${event.hashtag}` },
+          { id: "gracias", moment: "despues", headline: "¡Gracias, flockers!", body: `Gracias por ser parte de ${event.name}.`, post: `💜 ¡Gracias a todos los que hicieron posible ${event.name}!\n\n${event.hashtag}` },
         ]
       : [
-          { id: "anuncio", headline: event.name, body: desc, post: `📅 Save the date: ${event.name}, ${event.dateLabel}.\n\n${desc}\n\n${event.hashtag}` },
+          { id: "anuncio", moment: "antes", headline: event.name, body: desc, post: `📅 Save the date: ${event.name}, ${event.dateLabel}.\n\n${desc}\n\n${event.hashtag}` },
           {
-            id: "agenda",
-            headline: "The day at a glance",
+            id: "en-vivo",
+            moment: "durante",
+            headline: "Happening now",
             body: agenda.length ? `${agenda.length} sessions from start to finish.` : desc,
-            post: `Here's how ${event.name} unfolds:\n\n${firstItems || desc}\n\n${event.hashtag}`,
+            post: `${event.name} is happening today:\n\n${firstItems || desc}\n\n${event.hashtag}`,
           },
-          { id: "gracias", headline: "Thank you, flockers!", body: `Thanks for being part of ${event.name}.`, post: `💜 Thank you to everyone who made ${event.name} happen!\n\n${event.hashtag}` },
+          { id: "gracias", moment: "despues", headline: "Thank you, flockers!", body: `Thanks for being part of ${event.name}.`, post: `💜 Thank you to everyone who made ${event.name} happen!\n\n${event.hashtag}` },
+        ],
+    slack: es
+      ? [
+          { id: "anuncio", moment: "antes", headline: event.name, body: desc, text: `📅 *Agendalo:* ${event.name}, el ${event.dateLabel}${event.location ? ` en ${event.location}` : ""}.\n${desc}` },
+          { id: "hoy", moment: "durante", headline: "¡Es hoy!", body: desc, text: `¡Hoy es *${event.name}*!${agenda[0] ? ` Arrancamos a las ${agenda[0].start}.` : ""} Te esperamos.` },
+          { id: "gracias", moment: "despues", headline: "¡Gracias, flockers!", body: `Gracias por ser parte de ${event.name}.`, text: `💜 ¡Gracias por sumarte a *${event.name}*!` },
+        ]
+      : [
+          { id: "anuncio", moment: "antes", headline: event.name, body: desc, text: `📅 *Save the date:* ${event.name}, ${event.dateLabel}${event.location ? ` at ${event.location}` : ""}.\n${desc}` },
+          { id: "hoy", moment: "durante", headline: "It's today!", body: desc, text: `*${event.name}* is today!${agenda[0] ? ` We start at ${agenda[0].start}.` : ""} See you there.` },
+          { id: "gracias", moment: "despues", headline: "Thank you, flockers!", body: `Thanks for being part of ${event.name}.`, text: `💜 Thanks for joining *${event.name}*!` },
         ],
     landing: {
       intro: desc,
