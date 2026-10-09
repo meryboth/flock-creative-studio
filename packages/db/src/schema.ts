@@ -316,3 +316,78 @@ export const brandChunks = pgTable(
   },
   (t) => [index("brand_chunks_embedding_idx").using("hnsw", t.embedding.op("vector_cosine_ops"))],
 );
+
+// ─── Telemetría: trazabilidad de uso y de los modelos ───────────────────────
+// Ver docs/metricas-y-evals.md. Todo es local: no sale de la base de la app.
+
+/**
+ * Una fila por acción de una persona o del sistema (crear un evento, aplicar un cambio, programar una
+ * publicación, cargar la nómina…). `kind` sigue la taxonomía de docs/metricas-y-evals.md.
+ */
+export const usageEvents = pgTable(
+  "usage_events",
+  {
+    id: id(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    kind: text("kind").notNull(), // ej. "event.created", "change.applied", "post.scheduled"
+    actor: text("actor"), // quién (sin login todavía: el usuario del sistema o "local")
+    eventId: uuid("event_id").references(() => events.id, { onDelete: "set null" }),
+    runId: uuid("run_id").references(() => runs.id, { onDelete: "set null" }),
+    ok: boolean("ok").notNull().default(true),
+    durationMs: integer("duration_ms"),
+    props: jsonb("props"), // datos de la acción (nunca datos personales: ni nombres ni correos)
+  },
+  (t) => [index().on(t.kind, t.at), index().on(t.eventId)],
+);
+
+/** Una fila por llamada a un modelo (texto, visión, crítico, imagen), incluidos los intentos que fallaron. */
+export const llmCalls = pgTable(
+  "llm_calls",
+  {
+    id: id(),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    task: text("task").notNull(), // copy | editor | reference | critic | keyvisual | elements | eval
+    provider: text("provider").notNull(), // claude | gemini | comfyui
+    model: text("model").notNull(),
+    attempt: integer("attempt").notNull().default(1), // 1 = primer modelo de la cadena; >1 = respaldo
+    ok: boolean("ok").notNull(),
+    latencyMs: integer("latency_ms").notNull(),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    error: text("error"),
+    eventId: uuid("event_id").references(() => events.id, { onDelete: "set null" }),
+    runId: uuid("run_id").references(() => runs.id, { onDelete: "set null" }),
+  },
+  (t) => [index().on(t.task, t.at), index().on(t.model)],
+);
+
+// ─── Evals: calidad medida de los agentes y del diseño ──────────────────────
+
+/** Una corrida de una suite de evals (pnpm evals). */
+export const evalRuns = pgTable("eval_runs", {
+  id: id(),
+  suite: text("suite").notNull(), // copy | editor | reference | design
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  durationMs: integer("duration_ms"),
+  gitSha: text("git_sha"),
+  config: jsonb("config"), // proveedores y modelos usados
+  cases: integer("cases").notNull().default(0),
+  passed: integer("passed").notNull().default(0),
+  score: real("score"), // promedio de 0 a 1
+});
+
+/** Resultado de un caso dentro de una corrida: una o más métricas con su puntaje. */
+export const evalResults = pgTable(
+  "eval_results",
+  {
+    id: id(),
+    runId: uuid("run_id").notNull().references(() => evalRuns.id, { onDelete: "cascade" }),
+    caseId: text("case_id").notNull(),
+    score: real("score").notNull(), // 0 a 1
+    passed: boolean("passed").notNull(),
+    metrics: jsonb("metrics"), // { nombre: valor } de cada chequeo
+    notes: text("notes"),
+    latencyMs: integer("latency_ms"),
+  },
+  (t) => [index().on(t.runId)],
+);

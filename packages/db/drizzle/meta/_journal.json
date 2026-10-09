@@ -71,6 +71,13 @@
       "when": 1791571951937,
       "tag": "0009_left_stepford_cuckoos",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791572092347,
+      "tag": "0010_giant_alex_power",
+      "breakpoints": true
     }
   ]
 }

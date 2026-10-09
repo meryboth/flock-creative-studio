@@ -70,7 +70,9 @@ function slideTypographic(ctx: RenderContext, item: AgendaItem, index: number, a
         {item.room && <span className="pill">{item.room}</span>}
       </div>
       <p className="label index">{String(index + 1).padStart(2, "0")}</p>
-      <p className="display num big-time">{item.start}</p>
+      <p className="display num big-time" data-fit data-fit-min="160">
+        {item.start}
+      </p>
       {item.end && <p className="until num">→ {item.end}</p>}
       {ctx.kit.style.devices?.halftone && <Halftone x={area.x + 60} y={area.y + 40} size={Math.min(area.w, area.h) * 0.8} color="var(--accent2)" />}
       {backdrop}
@@ -93,7 +95,9 @@ function slideBlocks(ctx: RenderContext, item: AgendaItem, index: number, backdr
         {ctx.kit.style.devices?.halftone && <div className="halftone block-dots" />}
         <div className="block-copy">
           <p className="label index">{String(index + 1).padStart(2, "0")}</p>
-          <p className="display num big-time">{item.start}</p>
+          <p className="display num big-time" data-fit data-fit-min="120">
+            {item.start}
+          </p>
           {item.end && <p className="until num">{t(event.language).until} {item.end}</p>}
         </div>
       </div>
@@ -131,7 +135,7 @@ const SLIDE_CSS = `
 /* Tipográfico */
 .tipografico .chips { right: 120px; top: 92px; justify-content: flex-end; }
 .tipografico .index { left: 124px; top: 250px; font-size: 26px; color: var(--muted); }
-.tipografico .big-time { left: 104px; top: 290px; font-size: calc(340px * var(--title-scale)); }
+.tipografico .big-time { left: 104px; top: 290px; width: 1060px; overflow: hidden; font-size: calc(340px * var(--title-scale)); }
 .tipografico .until { left: 124px; top: 600px; font-size: 44px; color: var(--muted); font-weight: 600; }
 .tipografico .title-big { left: 120px; right: 120px; top: 690px; height: 230px; font-size: calc(104px * var(--title-scale)); overflow: hidden; }
 .tipografico .meta { left: 124px; bottom: 110px; font-size: 30px; color: var(--muted); }
@@ -143,7 +147,8 @@ const SLIDE_CSS = `
 .bloques .block { color: var(--on-accent); }
 .bloques .block-copy { position: absolute; left: 104px; top: 150px; }
 .bloques .block-copy .index { font-size: 26px; opacity: .8; }
-.bloques .big-time { margin-top: 24px; font-size: calc(250px * var(--title-scale)); }
+/* la hora entra entera en el bloque (fuentes anchas la achican) */
+.bloques .big-time { margin-top: 24px; width: 580px; overflow: hidden; font-size: calc(250px * var(--title-scale)); }
 .bloques .until { margin-top: 20px; font-size: 42px; font-weight: 600; opacity: .85; }
 .bloques .chips { left: 860px; top: 120px; }
 .bloques .title-big { left: 860px; right: 120px; top: 330px; height: 400px; font-size: calc(96px * var(--title-scale)); overflow: hidden; }

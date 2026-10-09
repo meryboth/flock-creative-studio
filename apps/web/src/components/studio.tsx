@@ -37,7 +37,23 @@ export function Studio({ eventId, groups, history, running }: { eventId: string;
   const [scope, setScope] = useState<Scope | null>(null);
   const [busy, setBusy] = useState<"thinking" | "applying" | "undoing" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  /** Abre el chat sobre una pieza (o general, sin pieza) y deja el cursor en el campo de texto. */
+  function openChat(piece: StudioPiece | null) {
+    setSelected(piece);
+    setChatOpen(true);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }
+
+  useEffect(() => {
+    if (!chatOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setChatOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [chatOpen]);
 
   useEffect(() => {
     const box = endRef.current;
@@ -103,7 +119,7 @@ export function Studio({ eventId, groups, history, running }: { eventId: string;
   const canUndo = history.some((h) => h.status === "applied");
 
   return (
-    <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_380px]">
+    <div>
       {/* ─── Galería seleccionable ─────────────────────────────── */}
       <div className={`min-w-0 space-y-14 transition-opacity ${running ? "pointer-events-none opacity-50" : ""}`}>
         {groups.map((g) => (
@@ -113,7 +129,7 @@ export function Studio({ eventId, groups, history, running }: { eventId: string;
               <span className="label-mono text-muted">{g.pieces.length} archivos</span>
             </h2>
             {g.toolbar}
-            <div className="grid gap-7 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
               {g.pieces.map((p) => {
                 const isSelected = selected?.file === p.file;
                 const selectable = p.kind === "png" || p.kind === "html";
@@ -125,9 +141,8 @@ export function Studio({ eventId, groups, history, running }: { eventId: string;
                     <button
                       type="button"
                       disabled={!selectable}
-                      onClick={() => setSelected(isSelected ? null : p)}
-                      aria-pressed={isSelected}
-                      aria-label={selectable ? `Elegir ${p.label} para editar` : p.label}
+                      onClick={() => openChat(p)}
+                      aria-label={selectable ? `Iterar ${p.label} en el chat` : p.label}
                       className="block w-full text-left disabled:cursor-default"
                     >
                       <div className="flex min-h-48 items-center justify-center overflow-hidden bg-[#ecebe5]">
@@ -147,7 +162,17 @@ export function Studio({ eventId, groups, history, running }: { eventId: string;
                         <span className="truncate font-mono text-xs text-muted">{p.file.split("/").pop()}</span>
                       </span>
                       <span className="flex shrink-0 items-center gap-2">
-                        {isSelected && <span className="sticker bg-yellow text-[11px]">elegida</span>}
+                        {selectable && (
+                          <button
+                            type="button"
+                            onClick={() => openChat(p)}
+                            aria-label={`Abrir el chat sobre ${p.label}`}
+                            className={`flex items-center gap-1.5 border-[1.5px] border-ink px-2 py-1 font-mono text-[11px] font-semibold uppercase tracking-wider transition ${isSelected && chatOpen ? "bg-yellow" : "bg-surface hover:bg-yellow"}`}
+                          >
+                            <ChatIcon />
+                            chat
+                          </button>
+                        )}
                         {p.kind === "png" && (
                           <button
                             type="button"
@@ -171,21 +196,47 @@ export function Studio({ eventId, groups, history, running }: { eventId: string;
         ))}
       </div>
 
-      {/* ─── Chat de edición ───────────────────────────────────── */}
-      <aside className="min-w-0 lg:sticky lg:top-6 lg:self-start">
-        <div className="flex max-h-[calc(100vh-3rem)] flex-col border-[1.5px] border-ink bg-surface">
+      {/* ─── Chat de edición: panel lateral que se abre desde cada pieza ─── */}
+      {!chatOpen && (
+        <button type="button" onClick={() => openChat(null)} className="btn-ink fixed bottom-6 right-6 z-30 shadow-[4px_4px_0_var(--yellow)]">
+          <ChatIcon /> Chat de edición
+        </button>
+      )}
+      {chatOpen && <div className="fixed inset-0 z-40 bg-ink/25 lg:bg-transparent" onClick={() => setChatOpen(false)} aria-hidden />}
+      <aside
+        aria-label="Chat de edición"
+        aria-hidden={!chatOpen}
+        inert={!chatOpen}
+        className={`fixed inset-y-0 right-0 z-50 w-full max-w-[440px] transition-transform duration-200 ease-out ${chatOpen ? "translate-x-0" : "translate-x-full"}`}
+      >
+        <div className="flex h-full flex-col border-l-[1.5px] border-ink bg-surface shadow-[-12px_0_40px_-20px_rgba(0,0,0,0.45)]">
           <div className="flex items-center justify-between gap-3 border-b-[1.5px] border-ink bg-yellow px-4 py-3">
             <p className="font-hand text-2xl font-bold leading-none">chat de edición</p>
-            <button type="button" onClick={undo} disabled={!canUndo || busy !== null || running} className="label-mono text-ink underline underline-offset-4 disabled:opacity-40">
-              deshacer último
-            </button>
+            <span className="flex items-center gap-4">
+              <button type="button" onClick={undo} disabled={!canUndo || busy !== null || running} className="label-mono text-ink underline underline-offset-4 disabled:opacity-40">
+                deshacer último
+              </button>
+              <button type="button" onClick={() => setChatOpen(false)} aria-label="Cerrar el chat" className="label-mono text-ink underline underline-offset-4">
+                cerrar
+              </button>
+            </span>
           </div>
+          {selected && (
+            <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={selected.previewUrl ?? selected.url} alt="" className="h-16 w-16 shrink-0 border border-ink/20 bg-[#ecebe5] object-contain" />
+              <div className="min-w-0">
+                <p className="label-mono text-muted">iterando sobre</p>
+                <p className="truncate font-semibold">{selected.label}</p>
+              </div>
+            </div>
+          )}
 
           <div ref={endRef} className="flex-1 space-y-4 overflow-y-auto p-4 text-sm" aria-live="polite">
             {!history.length && !proposal && (
               <div className="space-y-3">
                 <p className="text-muted">
-                  Elegí una pieza (o ninguna, para un cambio general) y contame qué querés cambiar. Te muestro qué voy a hacer y elegís a qué piezas se aplica.
+                  Contame qué querés cambiar. Abrí el chat desde una pieza para iterar solo esa, o desde acá para un cambio general. Te muestro qué voy a hacer y elegís a qué piezas se aplica.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {SUGGESTIONS.map((s) => (
@@ -295,14 +346,15 @@ export function Studio({ eventId, groups, history, running }: { eventId: string;
                   sobre: <span className="font-semibold">{selected.label}</span>
                 </span>
                 <button type="button" onClick={() => setSelected(null)} className="label-mono shrink-0 text-muted underline">
-                  quitar
+                  cambio general
                 </button>
               </p>
             ) : (
-              <p className="text-xs text-muted">Sin pieza elegida: el cambio es general.</p>
+              <p className="text-xs text-muted">Sin pieza elegida: el cambio es general. Para iterar una pieza, tocá «chat» en su tarjeta.</p>
             )}
             <div className="flex gap-2">
               <textarea
+                ref={inputRef}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
@@ -325,5 +377,13 @@ export function Studio({ eventId, groups, history, running }: { eventId: string;
         </div>
       </aside>
     </div>
+  );
+}
+
+function ChatIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v6a1.5 1.5 0 0 1-1.5 1.5H7l-3.5 3v-3h0A1.5 1.5 0 0 1 2 9.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
   );
 }
