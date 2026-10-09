@@ -5,7 +5,8 @@
  * hoja rayada sobre grilla gris, stickers, cinta y anotaciones a mano.
  */
 :root {
-  --desk: #8e8e8e; /* mesa con grilla, detrás de la hoja */
+  --desk: #1f6b57; /* plancha de corte verde, detrás de la hoja */
+  --mat-cell: 28px; /* un cuadro de la plancha */
   --background: #f8f7f2; /* papel */
   --surface: #ffffff;
   --rule: rgba(22, 22, 22, 0.075); /* renglones */
@@ -46,14 +47,24 @@ html {
   background: var(--desk);
 }
 
-/* Mesa: grilla blanca sobre gris */
+/*
+ * Plancha de corte: grilla fina en cada cuadro y líneas marcadas cada 5, fija detrás de la hoja.
+ * Los números de regla de los bordes los dibuja <CuttingMatRulers />.
+ */
 body {
   color: var(--foreground);
   background-color: var(--desk);
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.55) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.55) 1px, transparent 1px);
-  background-size: 56px 56px;
+    linear-gradient(rgba(255, 255, 255, 0.5) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.5) 2px, transparent 2px),
+    linear-gradient(rgba(255, 255, 255, 0.22) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.22) 1px, transparent 1px);
+  background-size:
+    calc(var(--mat-cell) * 5) calc(var(--mat-cell) * 5),
+    calc(var(--mat-cell) * 5) calc(var(--mat-cell) * 5),
+    var(--mat-cell) var(--mat-cell),
+    var(--mat-cell) var(--mat-cell);
+  background-attachment: fixed;
 }
 
 /* Hoja: papel rayado */

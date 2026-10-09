@@ -85,6 +85,24 @@ export const moodboardImages = pgTable(
   (t) => [index().on(t.eventId)],
 );
 
+// ─── Biblioteca de estilos ──────────────────────────────────────────────────
+
+/**
+ * Estilos creados por el equipo a partir de referencias gráficas. Los eventos guardan una copia
+ * del estilo al crearse, así que borrar un estilo de la biblioteca no afecta a eventos existentes.
+ */
+export const styles = pgTable("styles", {
+  id: id(),
+  name: text("name").notNull(),
+  // Lectura de la referencia (ReferenceStyle de @flock/templates)
+  reference: jsonb("reference").notNull(),
+  keyVisualPrompt: text("key_visual_prompt"),
+  // Archivos dentro de storage/styles/<id>/: imágenes de referencia y key visual opcional
+  images: text("images").array().notNull().default([]),
+  keyVisual: text("key_visual"),
+  createdAt: createdAt(),
+});
+
 // ─── Exploración de identidad ───────────────────────────────────────────────
 
 export const directionStatus = pgEnum("direction_status", ["proposed", "selected", "discarded"]);

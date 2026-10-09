@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Caveat, Geist, Geist_Mono, Pixelify_Sans } from "next/font/google";
 import { AppHeader } from "@/components/app-header";
+import { CuttingMatRulers } from "@/components/cutting-mat";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -17,7 +18,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="es" className={`${geistSans.variable} ${geistMono.variable} ${pixelify.variable} ${caveat.variable} h-full antialiased`}>
       <body className="min-h-full px-3 py-6 font-sans sm:px-8 sm:py-10">
-        <div className="sheet mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-6xl flex-col">
+        <CuttingMatRulers />
+        <div className="sheet relative mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-6xl flex-col">
           <AppHeader />
           <div className="flex-1">{children}</div>
           <footer className="flex items-center justify-between gap-4 border-t border-border px-5 py-5 sm:px-10">

@@ -29,6 +29,13 @@ El repo es público, así que algunos archivos quedan solo en la máquina local 
 
 La app y la CLI funcionan sin ellos: el evento de ejemplo se genera sin imagen propia y la página de marca muestra solo los elementos disponibles.
 
+## Qué se puede hacer
+
+- **Eventos:** definir un evento (datos, estilo, agenda) y generar la familia completa de piezas.
+- **Estilos:** armar una biblioteca de estilos del equipo a partir de piezas de referencia, ver cómo se aplican y borrarlos.
+- **Referencia gráfica:** subir una imagen y que el sistema lea su esencia (Gemini con visión) para proponer un estilo.
+- **Key visual:** generar un objeto original inspirado en la referencia (ComfyUI local o Gemini).
+
 ## Generación de key visuals con ComfyUI
 
 Ver [comfy/README.md](comfy/README.md). Requiere Comfy Desktop abierto y el modelo SDXL base en `~/ComfyUI-Shared/models/checkpoints`. Si ComfyUI no está disponible, se intenta con Gemini (requiere facturación activa).

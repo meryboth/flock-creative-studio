@@ -5,8 +5,12 @@ import { redirect } from "next/navigation";
 import { parseAgenda, parseAttendees } from "@flock/studio";
 import { STYLES, type StyleId } from "@flock/templates";
 import { existsSync } from "node:fs";
+import { copyFile, mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { STORAGE_DIR } from "@/lib/paths";
+import { getLibraryStyle } from "@/lib/style-library";
 import { keyVisualPath, readReference } from "@/lib/reference";
-import { createEvent, runGeneration, type StyleChoice } from "@/lib/studio";
+import { createEvent, runGeneration, setEventKeyVisual, type StyleChoice } from "@/lib/studio";
 
 export type FormState = { error?: string; field?: string };
 
@@ -45,7 +49,14 @@ export async function createEventAction(_prev: FormState, form: FormData): Promi
     seeds: { accent: HEX.test(accent) ? accent : "#2b3bff", accent2: HEX.test(accent2) ? accent2 : undefined },
     seed: Number(get("seed")) || 1,
   };
-  if (styleId === "referencia") {
+  const libraryStyleId = get("libraryStyleId");
+  if (styleId === "referencia" && libraryStyleId) {
+    const library = await getLibraryStyle(libraryStyleId);
+    if (!library) return { error: "Ese estilo ya no está en la biblioteca. Elegí otro.", field: "style" };
+    style.reference = library.reference;
+    style.libraryStyleId = library.id;
+    if (library.keyVisual) style.keyVisual = library.keyVisual; // se copia al evento después de crearlo
+  } else if (styleId === "referencia") {
     const upload = get("referenceUpload");
     const stored = upload ? await readReference(upload).catch(() => null) : null;
     if (!stored) return { error: "No encontramos la lectura de tu referencia. Volvé a subir la imagen.", field: "style" };
@@ -67,6 +78,14 @@ export async function createEventAction(_prev: FormState, form: FormData): Promi
     agenda,
     attendees,
   });
+
+  // El evento guarda su propia copia del key visual: si después se borra el estilo o la subida, no se pierde
+  if (style.keyVisual && existsSync(join(STORAGE_DIR, style.keyVisual))) {
+    const own = `${id}/inputs/keyvisual.png`;
+    await mkdir(join(STORAGE_DIR, id, "inputs"), { recursive: true });
+    await copyFile(join(STORAGE_DIR, style.keyVisual), join(STORAGE_DIR, own));
+    await setEventKeyVisual(id, own);
+  }
 
   // La generación (Gemini + render) tarda: corre después de responder y la página muestra el progreso
   after(() => runGeneration(id));

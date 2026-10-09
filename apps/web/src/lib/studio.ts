@@ -1,5 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { asc, desc, eq } from "drizzle-orm";
 import { db, schema } from "@flock/db";
@@ -15,6 +16,7 @@ export type StyleChoice = {
   // Estilo "referencia": lectura de la imagen y, opcional, key visual generado (ruta relativa a storage/)
   reference?: ReferenceStyle;
   referenceUpload?: string;
+  libraryStyleId?: string; // si vino de la biblioteca de estilos
   keyVisual?: string;
 };
 
@@ -124,7 +126,8 @@ export async function runGeneration(eventId: string, { rewriteCopy = true } = {}
       seeds: style.seeds,
       seed: style.seed,
       reference: style.reference,
-      keyVisual: style.keyVisual ? { file: style.keyVisual, fit: "object" } : undefined,
+      // el key visual es opcional: si el archivo ya no está, se genera sin él
+      keyVisual: style.keyVisual && existsSync(join(STORAGE_DIR, style.keyVisual)) ? { file: style.keyVisual, fit: "object" } : undefined,
     });
 
     let content = event.content as EventContent | null;
@@ -146,7 +149,7 @@ export async function runGeneration(eventId: string, { rewriteCopy = true } = {}
       attendees,
       repoRoot: REPO_ROOT,
       outDir: join(STORAGE_DIR, eventId),
-      keyVisualPath: style.keyVisual ? join(STORAGE_DIR, style.keyVisual) : undefined,
+      keyVisualPath: style.keyVisual && existsSync(join(STORAGE_DIR, style.keyVisual)) ? join(STORAGE_DIR, style.keyVisual) : undefined,
       onProgress: async (progress, total, label) => {
         await update({ progress, total, stage: `Generando: ${label}` });
       },
@@ -172,4 +175,10 @@ export async function runGeneration(eventId: string, { rewriteCopy = true } = {}
     // Sale de "producing" para que la página muestre el error y permita reintentar
     await db.update(schema.events).set({ status: "done" }).where(eq(schema.events.id, eventId));
   }
+}
+
+/** Apunta el estilo del evento a su copia propia del key visual. */
+export async function setEventKeyVisual(eventId: string, keyVisual: string) {
+  const [event] = await db.select({ style: schema.events.style }).from(schema.events).where(eq(schema.events.id, eventId));
+  await db.update(schema.events).set({ style: { ...(event.style as StyleChoice), keyVisual } }).where(eq(schema.events.id, eventId));
 }

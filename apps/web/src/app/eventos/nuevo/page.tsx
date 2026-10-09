@@ -1,9 +1,10 @@
+import { Suspense } from "react";
 import { STYLE_LIST, DEFAULT_SEEDS } from "@flock/templates";
+import { listLibraryStyles } from "@/lib/style-library";
 import { ArrowDoodle } from "@/components/doodles";
 import { NewEventForm } from "./new-event-form";
 
-export default function NewEventPage() {
-  const styles = STYLE_LIST.map((s) => ({ id: s.id, name: s.name, description: s.description, customColors: s.customColors, defaults: DEFAULT_SEEDS[s.id] }));
+export default function NewEventPage({ searchParams }: PageProps<"/eventos/nuevo">) {
   return (
     <main className="px-5 py-12 sm:px-10">
       <header className="mb-12 flex flex-wrap items-end gap-x-8 gap-y-3">
@@ -18,7 +19,28 @@ export default function NewEventPage() {
           tres pasos y listo
         </p>
       </header>
-      <NewEventForm styles={styles} />
+      <Suspense fallback={<p className="font-hand text-2xl text-muted">preparando el formulario…</p>}>
+        <FormWithLibrary searchParams={searchParams} />
+      </Suspense>
     </main>
+  );
+}
+
+async function FormWithLibrary({ searchParams }: { searchParams: PageProps<"/eventos/nuevo">["searchParams"] }) {
+  const { estilo } = await searchParams;
+  const library = await listLibraryStyles();
+  const styles = STYLE_LIST.map((s) => ({ id: s.id, name: s.name, description: s.description, customColors: s.customColors, defaults: DEFAULT_SEEDS[s.id] }));
+  const initial = typeof estilo === "string" && library.some((l) => l.id === estilo) ? estilo : undefined;
+  return (
+    <NewEventForm
+      styles={styles}
+      library={library.map((l) => ({
+        id: l.id,
+        name: l.name,
+        description: l.reference.description,
+        colors: { accent: l.reference.colors.accent, accent2: l.reference.colors.accent2 },
+      }))}
+      initialLibraryId={initial}
+    />
   );
 }

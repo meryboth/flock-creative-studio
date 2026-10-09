@@ -16,3 +16,4 @@ Bitácora de lo que se fue implementando en **Flock Creative Studio** (antes "Fl
 | 06 | [El circuito en la app: evento → estilo → familia](06-circuito-en-la-app.md) | 2026-10-09 |
 | 07 | [Nómina y credenciales](07-nomina-y-credenciales.md) | 2026-10-09 |
 | 08 | [La referencia como inspiración y el rediseño del estudio](08-referencia-y-rediseno.md) | 2026-10-09 |
+| 09 | [Key visuals locales con ComfyUI y biblioteca de estilos](09-comfyui-y-biblioteca-de-estilos.md) | 2026-10-09 |

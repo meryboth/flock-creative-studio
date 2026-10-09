@@ -2,22 +2,16 @@
 
 import { useActionState, useDeferredValue, useMemo, useRef, useState } from "react";
 import { PreviewFrame } from "@/components/preview-frame";
+import { ReferencePanel, type KeyVisualState, type ReferenceReading } from "@/components/reference-panel";
 import { createEventAction, type FormState } from "./actions";
 
+// id: un estilo del catálogo, "referencia" (imagen subida acá) o "lib:<uuid>" (biblioteca del equipo)
 type StyleOption = {
-  id: "iridiscente" | "grilla" | "flock" | "organico" | "referencia";
+  id: string;
   name: string;
   description: string;
   customColors: boolean;
   defaults: { accent: string; accent2?: string };
-};
-
-type ReferenceReading = {
-  description: string;
-  mood: string[];
-  typography: { display: string; case: "upper" | "title"; weight: string; width: string };
-  generator: "orbs" | "grid" | "pieces" | "blobs";
-  colors: { ground: string; accent: string; accent2: string };
 };
 
 type Moodboard = {
@@ -25,20 +19,12 @@ type Moodboard = {
   images: string[];
   colors: string[];
   seeds: { accent: string; accent2: string };
-  suggestedStyle: StyleOption["id"];
+  suggestedStyle: string;
   reason: string;
   reference: ReferenceReading | null;
   referenceError: string | null;
 };
 
-const GENERATOR_LABEL: Record<ReferenceReading["generator"], string> = {
-  orbs: "esferas de luz",
-  grid: "formas geométricas en grilla",
-  pieces: "trazos con degradado",
-  blobs: "formas orgánicas",
-};
-const WEIGHT_LABEL: Record<string, string> = { regular: "regular", bold: "negrita", black: "extra negrita" };
-const WIDTH_LABEL: Record<string, string> = { condensed: "condensada", normal: "", extended: "extendida" };
 
 const PIECES = [
   { id: "linkedin", label: "Posteo", width: 1200, height: 1200 },
@@ -50,10 +36,12 @@ const AGENDA_PLACEHOLDER = `9:30 - 10:00 Bienvenida | Auditorio
 10:00 - 11:00 Charla de apertura
 11:00 - 12:30 Workshops`;
 
-export function NewEventForm({ styles }: { styles: StyleOption[] }) {
+export type LibraryOption = { id: string; name: string; description: string; colors: { accent: string; accent2: string } };
+
+export function NewEventForm({ styles, library, initialLibraryId }: { styles: StyleOption[]; library: LibraryOption[]; initialLibraryId?: string }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(createEventAction, {});
   const [fields, setFields] = useState({ name: "", date: "", location: "", language: "es", description: "", hashtag: "", tagline: "" });
-  const [styleId, setStyleId] = useState<StyleOption["id"]>("iridiscente");
+  const [styleId, setStyleId] = useState<string>(initialLibraryId ? `lib:${initialLibraryId}` : "iridiscente");
   const [colors, setColors] = useState<Record<string, { accent: string; accent2: string }>>(() =>
     Object.fromEntries(styles.map((s) => [s.id, { accent: s.defaults.accent, accent2: s.defaults.accent2 ?? s.defaults.accent }])),
   );
@@ -63,16 +51,18 @@ export function NewEventForm({ styles }: { styles: StyleOption[] }) {
   const [moodboardError, setMoodboardError] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-  const [keyVisual, setKeyVisual] = useState<{ status: "idle" | "working" | "done" | "error"; message?: string; version?: number }>({ status: "idle" });
+  const [keyVisual, setKeyVisual] = useState<KeyVisualState>({ status: "idle" });
 
   const set = (k: keyof typeof fields) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setFields((f) => ({ ...f, [k]: e.target.value }));
 
   // Las vistas previas se recalculan con los datos "asentados", no en cada tecla
   const deferred = useDeferredValue(fields);
-  const previewUrl = (style: StyleOption["id"], p: string) => {
+  const previewUrl = (style: string, p: string) => {
     const c = colors[style] ?? { accent: "#2b3bff", accent2: "#c35cff" };
-    const q = new URLSearchParams({ ...deferred, style, accent: c.accent, accent2: c.accent2, seed: String(seed), piece: p });
+    const libraryId = style.startsWith("lib:") ? style.slice(4) : null;
+    const q = new URLSearchParams({ ...deferred, style: libraryId ? "referencia" : style, accent: c.accent, accent2: c.accent2, seed: String(seed), piece: p });
+    if (libraryId) q.set("lib", libraryId);
     if (style === "referencia" && moodboard) {
       q.set("ref", moodboard.uploadId);
       if (keyVisual.status === "done") {
@@ -83,23 +73,28 @@ export function NewEventForm({ styles }: { styles: StyleOption[] }) {
     return `/api/preview?${q}`;
   };
 
-  // Con una referencia leída, su estilo encabeza el catálogo
-  const allStyles = useMemo<StyleOption[]>(
-    () =>
-      moodboard?.reference
-        ? [
-            {
-              id: "referencia",
-              name: "Tu referencia",
-              description: moodboard.reference.description,
-              customColors: false,
-              defaults: { accent: moodboard.reference.colors.accent, accent2: moodboard.reference.colors.accent2 },
-            },
-            ...styles,
-          ]
-        : styles,
-    [moodboard, styles],
-  );
+  // Orden: la referencia recién subida, después los estilos del equipo y al final el catálogo
+  const allStyles = useMemo<StyleOption[]>(() => {
+    const fromUpload: StyleOption[] = moodboard?.reference
+      ? [
+          {
+            id: "referencia",
+            name: "Tu referencia",
+            description: moodboard.reference.description,
+            customColors: false,
+            defaults: { accent: moodboard.reference.colors.accent, accent2: moodboard.reference.colors.accent2 },
+          },
+        ]
+      : [];
+    const fromLibrary: StyleOption[] = library.map((l) => ({
+      id: `lib:${l.id}`,
+      name: l.name,
+      description: l.description,
+      customColors: false,
+      defaults: l.colors,
+    }));
+    return [...fromUpload, ...fromLibrary, ...styles];
+  }, [moodboard, styles, library]);
   const current = allStyles.find((s) => s.id === styleId) ?? allStyles[0];
   const currentPiece = PIECES.find((p) => p.id === piece)!;
 
@@ -240,51 +235,7 @@ export function NewEventForm({ styles }: { styles: StyleOption[] }) {
                   )}
                 </div>
                 {moodboard.reference ? (
-                  <div className="taped -rotate-[0.6deg] space-y-3 bg-yellow p-5 text-sm shadow-md">
-                    <p className="font-hand text-3xl font-bold leading-none">lo que vimos</p>
-                    <p className="text-muted">{moodboard.reference.description}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {moodboard.reference.mood.map((m) => (
-                        <span key={m} className="sticker bg-surface text-xs">
-                          {m}
-                        </span>
-                      ))}
-                    </div>
-                    <dl className="grid gap-x-6 gap-y-1 text-muted sm:grid-cols-[auto_1fr]">
-                      <dt>Tipografía</dt>
-                      <dd className="text-foreground">
-                        {[
-                          moodboard.reference.typography.display,
-                          moodboard.reference.typography.case === "upper" ? "mayúsculas" : "minúsculas",
-                          WIDTH_LABEL[moodboard.reference.typography.width],
-                          WEIGHT_LABEL[moodboard.reference.typography.weight],
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </dd>
-                      <dt>Visual</dt>
-                      <dd className="text-foreground">{GENERATOR_LABEL[moodboard.reference.generator]}</dd>
-                    </dl>
-                    <div className="flex flex-wrap items-center gap-3 pt-1">
-                      <button
-                        type="button"
-                        onClick={onGenerateKeyVisual}
-                        disabled={keyVisual.status === "working"}
-                        className="btn-line"
-                      >
-                        {keyVisual.status === "working" ? "Generando key visual…" : keyVisual.status === "done" ? "Generar otro key visual" : "Generar key visual con IA"}
-                      </button>
-                      <span className="text-muted">
-                        {keyVisual.status === "error"
-                          ? keyVisual.message
-                          : keyVisual.status === "done"
-                            ? keyVisual.message
-                            : keyVisual.status === "working"
-                              ? "Generando en tu Mac con ComfyUI: puede tardar uno a tres minutos."
-                              : "Opcional: una imagen original inspirada en tu referencia, sin texto."}
-                      </span>
-                    </div>
-                  </div>
+                  <ReferencePanel reading={moodboard.reference} keyVisual={keyVisual} onGenerateKeyVisual={onGenerateKeyVisual} />
                 ) : (
                   moodboard.referenceError && <p className="text-sm text-muted">No pudimos leer el estilo con IA; usamos solo los colores. ({moodboard.referenceError})</p>
                 )}
@@ -335,7 +286,9 @@ export function NewEventForm({ styles }: { styles: StyleOption[] }) {
               </>
             ) : (
               <p className="text-sm text-muted">
-                {styleId === "referencia" ? "Este estilo usa los colores de tu referencia." : "Este estilo usa los colores institucionales de Flock."}
+                {styleId === "referencia" || styleId.startsWith("lib:")
+                  ? "Este estilo usa los colores de su referencia."
+                  : "Este estilo usa los colores institucionales de Flock."}
               </p>
             )}
             <button type="button" onClick={() => setSeed((n) => n + 1)} className="btn-line">
@@ -357,7 +310,8 @@ export function NewEventForm({ styles }: { styles: StyleOption[] }) {
           </div>
         </fieldset>
 
-        <input type="hidden" name="styleId" value={styleId} />
+        <input type="hidden" name="styleId" value={styleId.startsWith("lib:") ? "referencia" : styleId} />
+        <input type="hidden" name="libraryStyleId" value={styleId.startsWith("lib:") ? styleId.slice(4) : ""} />
         <input type="hidden" name="accent" value={(colors[styleId] ?? current.defaults).accent} />
         <input type="hidden" name="accent2" value={(colors[styleId] ?? current.defaults).accent2 ?? ""} />
         <input type="hidden" name="referenceUpload" value={styleId === "referencia" && moodboard ? moodboard.uploadId : ""} />
