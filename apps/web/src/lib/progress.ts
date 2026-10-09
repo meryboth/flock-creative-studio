@@ -1,17 +1,16 @@
 import "server-only";
-import type { KeyVisualProgress } from "@flock/agents";
 
 /**
  * Progreso de trabajos largos en curso (ej. generar un key visual), en memoria del servidor.
  * Alcanza para una app local de un solo proceso; con varios procesos iría a la base.
  */
-type Entry = KeyVisualProgress & { startedAt: number };
+type Entry = Record<string, unknown> & { startedAt: number };
 
 const store = ((globalThis as unknown as { __flockProgress?: Map<string, Entry> }).__flockProgress ??= new Map());
 
-export function setProgress(key: string, progress: KeyVisualProgress) {
+export function setProgress(key: string, progress: Record<string, unknown>) {
   const prev = store.get(key);
-  store.set(key, { ...progress, startedAt: prev?.startedAt ?? Date.now() });
+  store.set(key, { ...prev, ...progress, startedAt: prev?.startedAt ?? Date.now() });
 }
 
 export function getProgress(key: string) {

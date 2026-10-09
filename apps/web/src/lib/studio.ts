@@ -18,6 +18,7 @@ export type StyleChoice = {
   referenceUpload?: string;
   libraryStyleId?: string; // si vino de la biblioteca de estilos
   keyVisual?: string;
+  elements?: string[]; // elementos decorativos generados (rutas relativas a storage/)
 };
 
 export type NewEventInput = {
@@ -150,6 +151,7 @@ export async function runGeneration(eventId: string, { rewriteCopy = true } = {}
       repoRoot: REPO_ROOT,
       outDir: join(STORAGE_DIR, eventId),
       keyVisualPath: style.keyVisual && existsSync(join(STORAGE_DIR, style.keyVisual)) ? join(STORAGE_DIR, style.keyVisual) : undefined,
+      elementPaths: (style.elements ?? []).map((e) => join(STORAGE_DIR, e)).filter((p) => existsSync(p)),
       onProgress: async (progress, total, label) => {
         await update({ progress, total, stage: `Generando: ${label}` });
       },
@@ -177,8 +179,8 @@ export async function runGeneration(eventId: string, { rewriteCopy = true } = {}
   }
 }
 
-/** Apunta el estilo del evento a su copia propia del key visual. */
-export async function setEventKeyVisual(eventId: string, keyVisual: string) {
+/** Apunta el estilo del evento a sus copias propias del key visual y de los elementos. */
+export async function setEventGraphics(eventId: string, graphics: { keyVisual?: string; elements?: string[] }) {
   const [event] = await db.select({ style: schema.events.style }).from(schema.events).where(eq(schema.events.id, eventId));
-  await db.update(schema.events).set({ style: { ...(event.style as StyleChoice), keyVisual } }).where(eq(schema.events.id, eventId));
+  await db.update(schema.events).set({ style: { ...(event.style as StyleChoice), ...graphics } }).where(eq(schema.events.id, eventId));
 }

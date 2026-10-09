@@ -100,6 +100,7 @@ export const styles = pgTable("styles", {
   // Archivos dentro de storage/styles/<id>/: imágenes de referencia y key visual opcional
   images: text("images").array().notNull().default([]),
   keyVisual: text("key_visual"),
+  elements: text("elements").array().notNull().default([]), // elementos decorativos generados
   createdAt: createdAt(),
 });
 

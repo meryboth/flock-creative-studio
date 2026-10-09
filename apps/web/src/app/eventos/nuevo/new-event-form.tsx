@@ -3,7 +3,7 @@
 import { useActionState, useDeferredValue, useMemo, useRef, useState } from "react";
 import { PreviewFrame } from "@/components/preview-frame";
 import { AnalysisProgress } from "@/components/progress-views";
-import { ReferencePanel, type KeyVisualState, type ReferenceReading } from "@/components/reference-panel";
+import { ReferencePanel, requestGraphics, type KeyVisualState, type ReferenceReading } from "@/components/reference-panel";
 import { createEventAction, type FormState } from "./actions";
 
 // id: un estilo del catálogo, "referencia" (imagen subida acá) o "lib:<uuid>" (biblioteca del equipo)
@@ -67,8 +67,9 @@ export function NewEventForm({ styles, library, initialLibraryId }: { styles: St
     if (style === "referencia" && moodboard) {
       q.set("ref", moodboard.uploadId);
       if (keyVisual.status === "done") {
-        q.set("kv", "1");
         q.set("v", String(keyVisual.version));
+        if (keyVisual.keyVisualUrl) q.set("kv", "1");
+        if (keyVisual.elements?.length) q.set("el", "1");
       }
     }
     return `/api/preview?${q}`;
@@ -126,20 +127,10 @@ export function NewEventForm({ styles, library, initialLibraryId }: { styles: St
   }
 
   async function onGenerateKeyVisual() {
-    if (!moodboard) return;
+    const id = moodboard?.uploadId;
+    if (!id) return;
     setKeyVisual({ status: "working" });
-    try {
-      const res = await fetch(`/api/reference/${moodboard.uploadId}/keyvisual`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "No se pudo generar el key visual");
-      setKeyVisual({
-        status: "done",
-        version: Date.now(),
-        message: `Listo con ${data.provider === "comfyui" ? "ComfyUI (local)" : "Gemini"} en ${Math.round(data.seconds)} s: ya se ve en la vista previa.`,
-      });
-    } catch (err) {
-      setKeyVisual({ status: "error", message: err instanceof Error ? err.message : String(err) });
-    }
+    setKeyVisual(await requestGraphics(id));
   }
 
   const fieldError = (name: string) => (state.field === name ? state.error : undefined);
@@ -321,7 +312,8 @@ export function NewEventForm({ styles, library, initialLibraryId }: { styles: St
         <input type="hidden" name="accent" value={(colors[styleId] ?? current.defaults).accent} />
         <input type="hidden" name="accent2" value={(colors[styleId] ?? current.defaults).accent2 ?? ""} />
         <input type="hidden" name="referenceUpload" value={styleId === "referencia" && moodboard ? moodboard.uploadId : ""} />
-        <input type="hidden" name="keyVisual" value={styleId === "referencia" && keyVisual.status === "done" ? "1" : ""} />
+        <input type="hidden" name="keyVisual" value={styleId === "referencia" && keyVisual.status === "done" && keyVisual.keyVisualUrl ? "1" : ""} />
+        <input type="hidden" name="elements" value={styleId === "referencia" && keyVisual.status === "done" && keyVisual.elements?.length ? "1" : ""} />
         <input type="hidden" name="seed" value={seed} />
         <input type="hidden" name="moodboard" value={moodboard ? JSON.stringify(moodboard) : ""} />
 

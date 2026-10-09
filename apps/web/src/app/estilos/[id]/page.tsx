@@ -68,15 +68,22 @@ async function StyleDetail({ params }: { params: PageProps<"/estilos/[id]">["par
                 // eslint-disable-next-line @next/next/no-img-element
                 <img key={src} src={`/api/storage/${src}`} alt="Referencia del estilo" className="h-28 w-28 border-[1.5px] border-ink object-cover" />
               ))}
-              {style.keyVisual && (
-                <figure className="taped border-[1.5px] border-ink bg-[#ecebe5] p-1">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/api/storage/${style.keyVisual}`} alt="Key visual generado" className="h-28 w-28 object-contain" />
-                  <figcaption className="label-mono px-1 pt-1 text-muted">key visual</figcaption>
-                </figure>
-              )}
             </div>
           </div>
+          {(style.keyVisual || style.elements.length > 0) && (
+            <div>
+              <h2 className="boxed mb-5 text-lg font-semibold">gráficos generados</h2>
+              <div className="flex flex-wrap gap-3">
+                {[style.keyVisual, ...style.elements].filter(Boolean).map((src, i) => (
+                  <figure key={src} className={`border-[1.5px] border-ink bg-surface p-1 ${i === 0 && style.keyVisual ? "taped" : ""}`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`/api/storage/${src}`} alt="" className="h-24 w-24 object-contain [image-rendering:pixelated]" />
+                    <figcaption className="label-mono px-1 pt-1 text-muted">{i === 0 && style.keyVisual ? "key visual" : "elemento"}</figcaption>
+                  </figure>
+                ))}
+              </div>
+            </div>
+          )}
           <ReferencePanel reading={style.reference} />
         </div>
 

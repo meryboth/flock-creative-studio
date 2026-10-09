@@ -94,3 +94,61 @@ export function GenerationProgress({ stage, progress, total, startedAt }: { stag
     />
   );
 }
+
+type GraphicsState = {
+  keyVisual?: { phase: "queued" | "generating" | "cutout"; provider?: string; step?: number; total?: number };
+  elements?: { done: number; total: number };
+  startedAt: number;
+} | null;
+
+/** Progreso de "Generar gráficos con IA": key visual y elementos en paralelo. */
+export function GraphicsProgress({ uploadId, running }: { uploadId: string; running: boolean }) {
+  const [state, setState] = useState<GraphicsState>(null);
+  useEffect(() => {
+    if (!running) return;
+    let alive = true;
+    const poll = async () => {
+      const res = await fetch(`/api/reference/${uploadId}/graphics`, { cache: "no-store" }).catch(() => null);
+      if (alive && res?.ok) setState(await res.json());
+    };
+    poll();
+    const id = setInterval(poll, 1000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [uploadId, running]);
+
+  const elapsed = useElapsed(running, state?.startedAt);
+  const kv = state?.keyVisual;
+  const el = state?.elements;
+  const local = kv?.provider === "comfyui";
+  const kvDone = kv?.phase === "cutout";
+  const elDone = el ? el.done >= el.total : false;
+  const active = !state ? 0 : !kvDone || !elDone ? 1 : 2;
+  const detail = [
+    kv ? (kvDone ? "key visual listo" : kv.total ? `key visual: paso ${kv.step} de ${kv.total}` : "key visual en curso") : null,
+    el ? `elementos: ${el.done} de ${el.total}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const parts = (kv ? 1 : 0) + (el?.total ?? 0);
+  const doneParts = (kvDone ? 1 : 0) + (el?.done ?? 0);
+  return (
+    <div className="space-y-3 bg-surface/80 p-4">
+      <ProcessSteps
+        steps={[
+          { label: "Enviando tu referencia" },
+          { label: "Generando el key visual y los elementos", detail },
+          { label: "Recortando y ajustando" },
+        ]}
+        active={active}
+        elapsed={elapsed}
+        progress={parts ? { value: doneParts, max: parts } : null}
+      />
+      <p className="text-xs text-muted">
+        {local ? "El key visual se genera en tu Mac con ComfyUI: puede tardar 2 a 3 minutos." : "Con Gemini suele tardar entre 10 y 30 segundos."}
+      </p>
+    </div>
+  );
+}

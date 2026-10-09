@@ -17,6 +17,7 @@ export type LibraryStyle = {
   keyVisualPrompt: string | null;
   images: string[]; // rutas relativas a storage/
   keyVisual: string | null; // ruta relativa a storage/
+  elements: string[]; // rutas relativas a storage/
   createdAt: Date;
 };
 
@@ -63,12 +64,21 @@ export async function createLibraryStyle(name: string, uploadId: string) {
   const files = (await readdir(from)).filter((f) => /^\d+\.(png|jpe?g|webp)$/i.test(f) || f === "keyvisual.png");
   for (const f of files) await cp(join(from, f), join(to, f));
 
+  // Elementos decorativos generados (si los hay)
+  const fromElements = join(from, "elements");
+  const elementFiles = existsSync(fromElements) ? (await readdir(fromElements)).filter((f) => f.endsWith(".png")).sort() : [];
+  if (elementFiles.length) {
+    await mkdir(join(to, "elements"), { recursive: true });
+    for (const f of elementFiles) await cp(join(fromElements, f), join(to, "elements", f));
+  }
+
   const rel = (f: string) => `styles/${row.id}/${f}`;
   await db
     .update(schema.styles)
     .set({
       images: files.filter((f) => f !== "keyvisual.png").map(rel),
       keyVisual: files.includes("keyvisual.png") ? rel("keyvisual.png") : null,
+      elements: elementFiles.map((f) => rel(`elements/${f}`)),
     })
     .where(eq(schema.styles.id, row.id));
   return row.id;

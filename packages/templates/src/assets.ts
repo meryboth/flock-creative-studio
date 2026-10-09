@@ -20,7 +20,7 @@ type BrandManifest = { logos: { id: string; file: string }[]; elements?: { id: s
 
 export type AssetMode =
   // Render final: todo embebido como data URI (piezas y landing autocontenidas)
-  | { kind: "inline"; brandDir: string; keyVisualPath?: string }
+  | { kind: "inline"; brandDir: string; keyVisualPath?: string; elementPaths?: string[] }
   // Previews en la app: los archivos se piden por URL, el HTML queda liviano
   | {
       kind: "linked";
@@ -28,6 +28,7 @@ export type AssetMode =
       brandUrl: (file: string) => string;
       fontUrl: (family: string, subset: string) => string;
       keyVisualUrl?: string;
+      elementUrls?: string[];
     };
 
 export async function resolveAssets(kit: EventKit, mode: AssetMode): Promise<ResolvedAssets> {
@@ -50,7 +51,8 @@ export async function resolveAssets(kit: EventKit, mode: AssetMode): Promise<Res
       mode.keyVisualPath ? dataUri(mode.keyVisualPath) : undefined,
       ...families.map((f) => fontFaceCss(f, fontDataUri)),
     ]);
-    return { logo, brandPiece, keyVisual, fontCss: faces.join("\n") };
+    const elements = mode.elementPaths?.length ? await Promise.all(mode.elementPaths.map(dataUri)) : undefined;
+    return { logo, brandPiece, keyVisual, elements, fontCss: faces.join("\n") };
   }
 
   const faces = await Promise.all(families.map((f) => fontFaceCss(f, mode.fontUrl)));
@@ -58,6 +60,7 @@ export async function resolveAssets(kit: EventKit, mode: AssetMode): Promise<Res
     logo: mode.brandUrl(logoFile),
     brandPiece: mode.brandUrl(pieceFile),
     keyVisual: mode.keyVisualUrl,
+    elements: mode.elementUrls?.length ? mode.elementUrls : undefined,
     fontCss: faces.join("\n"),
   };
 }

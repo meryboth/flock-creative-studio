@@ -7,7 +7,7 @@ import { UPLOADS_DIR } from "./paths";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export type StoredReference = { style: ReferenceStyle; keyVisualPrompt: string; medium?: string; model: string };
+export type StoredReference = { style: ReferenceStyle; keyVisualPrompt: string; medium?: string; elements?: string[]; model: string };
 
 /** Carpeta de una subida de moodboard (valida el id para no salir de uploads/). */
 export function uploadDir(uploadId: string) {
@@ -28,3 +28,12 @@ export async function referenceImages(uploadId: string) {
 
 export const keyVisualPath = (uploadId: string) => join(uploadDir(uploadId), "keyvisual.png");
 export const keyVisualUrl = (uploadId: string) => `/api/storage/uploads/${uploadId}/keyvisual.png`;
+
+export const elementsDir = (uploadId: string) => join(uploadDir(uploadId), "elements");
+
+/** Elementos decorativos generados para una subida (rutas relativas a storage/). */
+export async function uploadElements(uploadId: string) {
+  const dir = elementsDir(uploadId);
+  if (!existsSync(dir)) return [];
+  return (await readdir(dir)).filter((f) => f.endsWith(".png")).sort().map((f) => `uploads/${uploadId}/elements/${f}`);
+}

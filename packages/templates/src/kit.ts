@@ -96,6 +96,7 @@ export type Attendee = {
 export type ResolvedAssets = {
   logo: string; // la variante que corresponde al esquema del estilo
   keyVisual?: string;
+  elements?: string[]; // elementos decorativos generados para el estilo (reemplazan a los motivos de código)
   brandPiece: string; // elemento decorativo de marca (SVG)
   fontCss: string;
 };

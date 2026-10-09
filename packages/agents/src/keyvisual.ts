@@ -19,6 +19,8 @@ type KeyVisualOptions = {
   medium?: string;
   // Proveedores a usar, en orden (por defecto: KEYVISUAL_PROVIDERS)
   providers?: string[];
+  // El prompt ya viene completo (no se envuelve con la plantilla del key visual)
+  raw?: boolean;
   onProgress?: (p: KeyVisualProgress) => void;
 };
 
@@ -39,6 +41,10 @@ const NEGATIVE =
  * Prompt del visual. Los modelos de difusión dan más peso al principio del texto y no entienden
  * colores en hexadecimal: primero la composición, y el fondo descrito con palabras.
  */
+// Las referencias suelen ser piezas de otras marcas: se toma el estilo, nunca el contenido
+const NO_COPY =
+  "Use the attached images ONLY for visual style (technique, palette, line weight, shading, mood). Do NOT reproduce any character, mascot, creature, logo, object or composition that appears in them; the subject must be different.";
+
 // Lo que cada técnica no tiene que tener (se suma al negativo general)
 const NEGATIVE_BY_MEDIUM: Record<string, string> = {
   "pixel-art": "perspective, 3d, photo, realistic, interior, room, grid, gradient, smooth shading, blur",
@@ -50,7 +56,7 @@ const NEGATIVE_BY_MEDIUM: Record<string, string> = {
 const negativeFor = (medium?: string) => [NEGATIVE, NEGATIVE_BY_MEDIUM[medium ?? ""]].filter(Boolean).join(", ");
 
 const visualPrompt = (o: KeyVisualOptions) =>
-  `${o.prompt}. A single subject, centered, no pedestal, no floor, surrounded by lots of negative space, isolated on a plain flat ${colorName(o.ground)} background. No text, no letters, no logos.`;
+  `${o.prompt}. ${MEDIUM_PHRASE[o.medium ?? ""] ?? ""}. A single subject, centered, no pedestal, no floor, surrounded by lots of negative space, isolated on a plain flat ${colorName(o.ground)} background. No text, no letters, no logos.`;
 
 const toOklch = converter("oklch");
 
@@ -84,7 +90,9 @@ export function colorName(hex: string) {
  * Prueba los proveedores de KEYVISUAL_PROVIDERS en orden (por defecto: ComfyUI local, después Gemini).
  */
 export async function generateKeyVisual(opts: KeyVisualOptions): Promise<KeyVisualResult> {
-  const order = opts.providers?.length ? opts.providers : (process.env.KEYVISUAL_PROVIDERS ?? "gemini,comfyui").split(",").map((p) => p.trim());
+  const order = opts.providers?.length
+    ? opts.providers
+    : (process.env.KEYVISUAL_PROVIDERS ?? "gemini,comfyui").split(",").map((p) => p.trim());
   const providers: Record<string, Provider> = {
     comfyui: comfyui,
     gemini: geminiImage,
@@ -143,7 +151,13 @@ async function pixelate(file: string, cells = 40, colors = 10) {
   for (let i = 3; i < data.length; i += 4) data[i] = data[i] < 128 ? 0 : 255;
   const quantized = await sharp(data, { raw: info }).png({ palette: true, colors, dither: 0 }).toBuffer();
   const factor = Math.max(8, Math.floor(1024 / Math.max(sw, sh)));
-  await writeFile(file, await sharp(quantized).resize(sw * factor, sh * factor, { kernel: "nearest" }).png().toBuffer());
+  await writeFile(
+    file,
+    await sharp(quantized)
+      .resize(sw * factor, sh * factor, { kernel: "nearest" })
+      .png()
+      .toBuffer(),
+  );
 }
 
 /**
@@ -284,8 +298,10 @@ const geminiImage: Provider = async (opts) => {
       ).toString("base64"),
     ),
   );
-  const prompt = `${visualPrompt(opts)}
-Use the attached images ONLY as stylistic inspiration (palette, materials, lighting, mood); do not copy them. Square format.`;
+  const prompt = opts.raw
+    ? opts.prompt
+    : `${visualPrompt(opts)}
+${NO_COPY} Square format.`;
 
   let lastError = "";
   let quota = false;
@@ -335,3 +351,55 @@ Use the attached images ONLY as stylistic inspiration (palette, materials, light
   }
   throw quota ? new QuotaError("sin cuota para generar imágenes (hay que activar la facturación)") : new Error(lastError);
 };
+
+// ─── Elementos decorativos del estilo (Gemini) ─────────────────────────────
+
+const MEDIUM_PHRASE: Record<string, string> = {
+  "pixel-art": "high quality pixel art sprite, clean 1px dark outline, 3-tone shading, limited palette, crisp pixels, game asset",
+  "flat-vector": "flat vector illustration, clean shapes, bold colors",
+  "hand-drawn": "hand-drawn illustration with expressive ink lines",
+  "3d-render": "glossy 3D render, studio lighting",
+  photo: "photographic object",
+  "abstract-gradient": "abstract shape with smooth gradients",
+};
+
+/**
+ * Genera elementos decorativos en el estilo exacto de la referencia (uno por sujeto, en paralelo),
+ * los recorta y, si la técnica es pixel art, los pixela. Devuelve las rutas generadas.
+ */
+export async function generateStyleElements(opts: {
+  references: string[];
+  subjects: string[];
+  medium?: string;
+  outDir: string;
+  onDone?: (done: number, total: number) => void;
+}): Promise<{ files: string[]; errors: string[] }> {
+  const files: string[] = [];
+  const errors: string[] = [];
+  let done = 0;
+  await Promise.all(
+    opts.subjects.slice(0, 4).map(async (subject, i) => {
+      const outFile = join(opts.outDir, `${i + 1}.png`);
+      const prompt = `${subject}. ${MEDIUM_PHRASE[opts.medium ?? ""] ?? ""}. A single small decorative element, centered, isolated on a plain flat white background, in the exact visual style of the attached reference (same line weight, palette and shading). ${NO_COPY} No text, no letters, no logos.`;
+      try {
+        await geminiImage({
+          references: opts.references,
+          prompt,
+          ground: "#ffffff",
+          outFile,
+          repoRoot: "",
+          medium: opts.medium,
+          raw: true,
+        });
+        await cutout(outFile).catch(() => undefined);
+        if (opts.medium === "pixel-art") await pixelate(outFile, 24, 8).catch(() => undefined);
+        files[i] = outFile;
+      } catch (err) {
+        errors.push(err instanceof Error ? err.message : String(err));
+      } finally {
+        opts.onDone?.(++done, Math.min(4, opts.subjects.length));
+      }
+    }),
+  );
+  return { files: files.filter(Boolean), errors };
+}

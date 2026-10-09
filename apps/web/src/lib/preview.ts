@@ -14,7 +14,7 @@ import { REPO_ROOT } from "./paths";
 export type PreviewPiece = "linkedin" | "badge" | "slide";
 
 /** HTML de una pieza de muestra con assets por URL: liviano, para iframes de vista previa. */
-export async function previewHtml(input: KitInput, piece: PreviewPiece, keyVisualUrl?: string) {
+export async function previewHtml(input: KitInput, piece: PreviewPiece, keyVisualUrl?: string, elementUrls?: string[]) {
   const kit = buildKit(input);
   const ctx: RenderContext = {
     kit,
@@ -24,6 +24,7 @@ export async function previewHtml(input: KitInput, piece: PreviewPiece, keyVisua
       brandUrl: (file) => `/api/brand/${file}`,
       fontUrl: (family, subset) => `/api/fonts/${encodeURIComponent(family)}/${subset}`,
       keyVisualUrl,
+      elementUrls,
     }),
   };
   const es = kit.event.language === "es";

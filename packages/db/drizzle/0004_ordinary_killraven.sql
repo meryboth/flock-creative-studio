@@ -1,0 +1,1 @@
+ALTER TABLE "styles" ADD COLUMN "elements" text[] DEFAULT '{}' NOT NULL;

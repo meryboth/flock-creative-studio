@@ -242,7 +242,7 @@ function PixelArt({ ctx, area, canvas, salt }: VisualProps) {
     <div style={layer}>
       <svg width={canvas.width} height={canvas.height} viewBox={`0 0 ${canvas.width} ${canvas.height}`} style={{ position: "absolute", inset: 0 }} shape-rendering="crispEdges">
         {layoutMotifs(ctx, area, canvas, r).map((m, i) => (
-          <PixelMotif motif={m.motif} x={m.x} y={m.y} size={m.size} color={m.color} outline={m.outline} cells={i === 0 ? 20 : 16} />
+          <PixelMotif motif={m.motif} x={m.x} y={m.y} size={m.size} colors={m.colors} cells={i === 0 ? 24 : 20} />
         ))}
       </svg>
     </div>
@@ -258,6 +258,26 @@ function Doodles({ ctx, area, canvas, salt }: VisualProps) {
           <DoodleMotif motif={m.motif} x={m.x} y={m.y} size={m.size} color={m.color} rand={r} />
         ))}
       </svg>
+    </div>
+  );
+}
+
+// ─── Elementos generados para el estilo (imágenes) ─────────────────────────
+
+function Elements({ ctx, area, canvas, salt }: VisualProps) {
+  const r = rng(ctx.kit.style.seed, salt);
+  const images = ctx.assets.elements ?? [];
+  // misma ubicación sin superposición que los motivos de código, con las imágenes generadas
+  const slots = layoutMotifs(ctx, area, canvas, r);
+  return (
+    <div style={layer}>
+      {slots.map((s, i) => (
+        <img
+          src={images[i % images.length]}
+          alt=""
+          style={{ position: "absolute", left: s.x, top: s.y, width: s.size, height: s.size, objectFit: "contain", imageRendering: "pixelated" }}
+        />
+      ))}
     </div>
   );
 }
@@ -324,10 +344,15 @@ export function Backdrop(props: VisualProps) {
   const fit = props.ctx.kit.style.keyVisual?.fit;
   const generator = resolveStyle(props.ctx.kit).generator;
   const drawGenerator = !fit || fit === "top" || (fit === "object" && generator === "orbs");
+  // Elementos generados con IA: reemplazan a los motivos de código. Si además hay un key visual (objeto),
+  // la familia alterna: unas piezas llevan el key visual y otras los elementos, según la pieza (salt).
+  const elements = Boolean(props.ctx.assets.elements?.length);
+  const objectKv = fit === "object" && Boolean(props.ctx.assets.keyVisual);
+  const useElements = elements && (!objectKv || rng(props.ctx.kit.style.seed, props.salt)() < 0.5);
   return (
     <>
-      {drawGenerator && <Generator {...props} />}
-      <KeyVisualImage {...props} />
+      {drawGenerator && !useElements && <Generator {...props} />}
+      {useElements ? <Elements {...props} /> : <KeyVisualImage {...props} />}
     </>
   );
 }

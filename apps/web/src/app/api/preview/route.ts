@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { STYLES, type Language, type StyleId } from "@flock/templates";
 import { existsSync } from "node:fs";
 import { previewHtml, type PreviewPiece } from "@/lib/preview";
-import { keyVisualPath, keyVisualUrl, readReference } from "@/lib/reference";
+import { keyVisualPath, keyVisualUrl, readReference, uploadElements } from "@/lib/reference";
 import { getLibraryStyle } from "@/lib/style-library";
 import { STORAGE_DIR } from "@/lib/paths";
 import { join } from "node:path";
@@ -30,6 +30,12 @@ export async function GET(req: NextRequest) {
   const libraryKv = library?.keyVisual && existsSync(join(STORAGE_DIR, library.keyVisual)) ? `/api/storage/${library.keyVisual}` : null;
   const uploadKv = !library && stored && ref && q.get("kv") === "1" && existsSync(keyVisualPath(ref)) ? keyVisualUrl(ref) : null;
   const kvUrl = libraryKv ?? uploadKv;
+  // Elementos generados: los de la biblioteca o, con ?el=1, los de la subida
+  const elementUrls = library
+    ? library.elements.filter((e) => existsSync(join(STORAGE_DIR, e))).map((e) => `/api/storage/${e}`)
+    : stored && ref && q.get("el") === "1"
+      ? (await uploadElements(ref)).map((e) => `/api/storage/${e}`)
+      : [];
 
   const html = await previewHtml(
     {
@@ -50,6 +56,7 @@ export async function GET(req: NextRequest) {
     },
     (q.get("piece") as PreviewPiece) ?? "linkedin",
     kvUrl ?? undefined,
+    elementUrls,
   );
   return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
 }

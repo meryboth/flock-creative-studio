@@ -40,38 +40,66 @@ const SHAPES: Record<Exclude<Motif, "squiggle">, { inside: Inside; fill: boolean
   sparkle: { inside: (x, y) => Math.sqrt(Math.abs(x)) + Math.sqrt(Math.abs(y)) <= 0.95, fill: true },
 };
 
-// Flor pixel: un anillo por pétalo más el centro (los contornos se cruzan, como en el pixel art clásico)
-const FLOWER_RINGS = [
-  ...Array.from({ length: 5 }, (_, k) => [Math.cos((k * 2 * Math.PI) / 5 - Math.PI / 2) * 0.5, Math.sin((k * 2 * Math.PI) / 5 - Math.PI / 2) * 0.5, 0.36] as const),
-  [0, 0, 0.22] as const,
-];
+// ─── Pixel art con oficio: regiones, contorno de 1 px y sombreado ───────────
+
+/** Región de cada punto del motivo: 0 = afuera, 1 = color principal, 2 = color secundario (ej. centro de la flor). */
+type Regions = (x: number, y: number) => 0 | 1 | 2;
+
+const REGIONS: Record<Motif, Regions> = {
+  flower: (x, y) => {
+    if (circle(0, 0, 0.26)(x, y)) return 2;
+    const petals = Array.from({ length: 5 }, (_, k) => {
+      const a = (k * 2 * Math.PI) / 5 - Math.PI / 2;
+      return circle(Math.cos(a) * 0.52, Math.sin(a) * 0.52, 0.4);
+    });
+    return petals.some((p) => p(x, y)) ? 1 : 0;
+  },
+  cloud: (x, y) => (SHAPES.cloud.inside(x, y) ? 1 : 0),
+  heart: (x, y) => (SHAPES.heart.inside(x, y) ? 1 : 0),
+  star: (x, y) => (SHAPES.star.inside(x, y) ? 1 : 0),
+  sparkle: (x, y) => (SHAPES.sparkle.inside(x, y) ? 1 : 0),
+  squiggle: (x, y) => (Math.abs(y - Math.sin(x * Math.PI * 2) * 0.35) < 0.16 && Math.abs(x) < 0.9 ? 1 : 0),
+};
+
+export type SpriteColors = { main: string; secondary: string; outline: string };
+
+/** Mezcla dos colores hex (t = 0 → a, t = 1 → b). */
+function mix(a: string, b: string, t: number) {
+  const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
+  const pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
+  return `#${pa.map((v, i) => Math.round(v + (pb[i] - v) * t).toString(16).padStart(2, "0")).join("")}`;
+}
 
 /**
- * Motivo en pixel art: grilla de N×N celdas. Relleno, solo contorno, o relleno claro con contorno de tinta
- * (`outline`, como las nubes de los videojuegos).
+ * Sprite en pixel art: grilla de N×N celdas con contorno de tinta de 1 px, luz arriba a la izquierda
+ * y sombra abajo a la derecha (como los sprites de videojuego), en vez de una forma plana.
  */
-export function PixelMotif({ motif, x, y, size, color, outline, cells = 16 }: { motif: Motif; x: number; y: number; size: number; color: string; outline?: string; cells?: number }): Html {
+export function PixelMotif({ motif, x, y, size, colors, cells = 20 }: { motif: Motif; x: number; y: number; size: number; colors: SpriteColors; cells?: number }): Html {
+  const region = REGIONS[motif];
   const c = size / cells;
   const coord = (i: number) => ((i + 0.5) / cells) * 2 - 1;
+  const grid: number[][] = Array.from({ length: cells }, (_, i) => Array.from({ length: cells }, (_, j) => region(coord(i), coord(j))));
+  const at = (i: number, j: number) => (i < 0 || j < 0 || i >= cells || j >= cells ? 0 : grid[i][j]);
+  const tones = (base: string) => ({ base, light: mix(base, "#ffffff", 0.45), dark: mix(base, "#000000", 0.28) });
+  const palette = { 1: tones(colors.main), 2: tones(colors.secondary) } as const;
+
   const rects: Html[] = [];
-  const cell = (i: number, j: number, fill: string) => rects.push(<rect x={x + i * c} y={y + j * c} width={c + 0.5} height={c + 0.5} fill={fill} />);
-
-  if (motif === "flower") {
-    const half = 1 / cells; // medio ancho de celda en coordenadas normalizadas
-    for (let i = 0; i < cells; i++)
-      for (let j = 0; j < cells; j++)
-        if (FLOWER_RINGS.some(([cx, cy, r]) => Math.abs(Math.hypot(coord(i) - cx, coord(j) - cy) - r) <= half * 1.1)) cell(i, j, color);
-    return <g>{rects}</g>;
-  }
-
-  const shape = motif === "squiggle" ? SHAPES.sparkle : SHAPES[motif];
-  const at = (i: number, j: number) => i >= 0 && j >= 0 && i < cells && j < cells && shape.inside(coord(i), coord(j));
   for (let i = 0; i < cells; i++)
     for (let j = 0; j < cells; j++) {
-      if (!at(i, j)) continue;
-      const edge = !at(i - 1, j) || !at(i + 1, j) || !at(i, j - 1) || !at(i, j + 1);
-      if (outline) cell(i, j, edge ? outline : color);
-      else if (shape.fill || edge) cell(i, j, color);
+      const r = grid[i][j];
+      if (!r) continue;
+      // contorno: borde con el afuera o con otra región
+      const edge = [at(i - 1, j), at(i + 1, j), at(i, j - 1), at(i, j + 1)].some((n) => n !== r);
+      let fill: string;
+      if (edge) fill = colors.outline;
+      else {
+        const t = palette[r as 1 | 2];
+        // luz: el contorno queda arriba o a la izquierda; sombra: abajo o a la derecha
+        const nearTopLeft = at(i - 2, j) !== r || at(i, j - 2) !== r;
+        const nearBottomRight = at(i + 2, j) !== r || at(i, j + 2) !== r;
+        fill = nearTopLeft && !nearBottomRight ? t.light : nearBottomRight && !nearTopLeft ? t.dark : t.base;
+      }
+      rects.push(<rect x={x + i * c} y={y + j * c} width={c + 0.5} height={c + 0.5} fill={fill} />);
     }
   return <g>{rects}</g>;
 }
@@ -149,7 +177,7 @@ export function layoutMotifs(
     y1: Math.min(area.y + area.h, canvas.height - margin),
   };
   const base = Math.min(zone.x1 - zone.x0, zone.y1 - zone.y0);
-  const placed: { motif: Motif; size: number; x: number; y: number; color: string; outline?: string }[] = [];
+  const placed: { motif: Motif; size: number; x: number; y: number; color: string; colors: SpriteColors }[] = [];
 
   for (let i = 0; i < 4; i++) {
     const motif = motifs[i % motifs.length];
@@ -163,12 +191,13 @@ export function layoutMotifs(
       if (free) best = { x, y };
     }
     if (!best) continue; // no hay lugar: mejor un motivo menos que motivos encimados
+    const main = cloud ? (ctx.kit.style.palette.scheme === "light" ? "#ffffff" : mix(ground, "#ffffff", 0.85)) : (vivid[i % vivid.length] ?? ink);
     placed.push({
       motif,
       size,
       ...best,
-      color: cloud ? (ctx.kit.style.palette.scheme === "light" ? "#ffffff" : ground) : (vivid[i % vivid.length] ?? ink),
-      outline: cloud ? ink : undefined,
+      color: main,
+      colors: { main, secondary: vivid[(i + 1) % vivid.length] ?? ctx.kit.style.palette.accent2, outline: ink },
     });
   }
   return placed;

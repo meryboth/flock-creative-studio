@@ -3,7 +3,10 @@ import { HumanMessage } from "@langchain/core/messages";
 import type { ReferenceStyle } from "@flock/templates";
 import sharp from "sharp";
 import { z } from "zod";
+import { converter } from "culori";
 import { analyzeMoodboard } from "./moodboard";
+
+const toOklch = converter("oklch");
 
 const HEX = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
@@ -48,16 +51,24 @@ const ReferenceSchema = z.object({
   corners: z.enum(["sharp", "soft", "round"]),
   ground: z.enum(["flat", "gradient"]),
   medium: z.enum(MEDIUMS).describe("Técnica visual dominante de la referencia"),
+  elements: z
+    .array(z.string())
+    .min(3)
+    .max(4)
+    .describe(
+      "En inglés: 3 o 4 elementos decorativos chicos y simples que aparecen o encajan con la referencia (ej. 'pixel art flower with outlined petals', 'pixel art cloud', 'pixel art heart'). Objetos genéricos: nunca personajes, mascotas ni logos de la referencia, sin texto.",
+    ),
   keyVisualPrompt: z
     .string()
     .describe(
-      "En inglés, empezando por la técnica (ej. 'pixel art of …', '3D render of …', 'flat vector illustration of …'): UN sujeto ORIGINAL, simple y fácil de leer (un objeto o personaje), que encaje con el clima de la referencia y con un evento de tecnología. No describas el fondo. No copies personajes, mascotas ni logos de la referencia. Sin texto.",
+      "En inglés, empezando por la técnica (ej. 'pixel art of …', '3D render of …', 'flat vector illustration of …'): UN sujeto ORIGINAL, simple y fácil de leer (un objeto o personaje), que encaje con el clima de la referencia y con un evento de tecnología. No describas el fondo. Tiene que ser de un TIPO distinto a cualquier personaje o mascota de la referencia (si hay un dinosaurio, no elijas un dinosaurio ni otro reptil). Sin texto ni logos.",
     ),
 });
 
 export type ReferenceAnalysis = {
   style: ReferenceStyle;
   keyVisualPrompt: string;
+  elements: string[]; // sujetos de los elementos decorativos (para generarlos con IA)
   medium: (typeof MEDIUMS)[number];
   model: string;
   extractedColors: string[];
@@ -119,8 +130,11 @@ export async function analyzeReference(files: string[]): Promise<ReferenceAnalys
       // Temperatura baja: la misma referencia tiene que dar (casi) la misma lectura
       const llm = new ChatGoogleGenerativeAI({ model, apiKey, temperature: 0.15, maxRetries: 1 });
       const out = await llm.withStructuredOutput(ReferenceSchema, { name: "reference_style" }).invoke([message], { signal: AbortSignal.timeout(60_000) });
-      const { keyVisualPrompt, medium, ...style } = out;
-      return { style, keyVisualPrompt, medium, model, extractedColors: measured.colors };
+      const { keyVisualPrompt, medium, elements, ...style } = out;
+      // Un texto muy oscuro y casi sin color es negro en la referencia (el extractor lo confunde con sombras)
+      const ink = toOklch(style.colors.ink);
+      if (ink && ink.l < 0.42 && (ink.c ?? 0) < 0.07) style.colors.ink = "#111111";
+      return { style, keyVisualPrompt, medium, elements, model, extractedColors: measured.colors };
     } catch (err) {
       errors.push(`${model}: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyVisualProgress } from "./progress-views";
+import { GraphicsProgress } from "./progress-views";
 
 // Post-it "lo que vimos": cómo se interpretó una referencia gráfica (se usa en eventos y en la biblioteca)
 
@@ -14,7 +14,14 @@ export type ReferenceReading = {
   colors: { ground: string; accent: string; accent2: string; shapes?: string[] };
 };
 
-export type KeyVisualState = { status: "idle" | "working" | "done" | "error"; message?: string; version?: number };
+export type KeyVisualState = {
+  status: "idle" | "working" | "done" | "error";
+  message?: string;
+  version?: number;
+  // resultado de "Generar gráficos con IA"
+  keyVisualUrl?: string | null;
+  elements?: string[];
+};
 
 const GENERATOR_LABEL: Record<ReferenceReading["generator"], string> = {
   orbs: "esferas de luz",
@@ -86,18 +93,50 @@ export function ReferencePanel({
       {keyVisual && onGenerateKeyVisual && (
         <div className="flex flex-wrap items-center gap-3 pt-1">
           <button type="button" onClick={onGenerateKeyVisual} disabled={keyVisual.status === "working"} className="btn-line">
-            {keyVisual.status === "working" ? "Generando key visual…" : keyVisual.status === "done" ? "Generar otro key visual" : "Generar key visual con IA"}
+            {keyVisual.status === "working" ? "Generando gráficos…" : keyVisual.status === "done" ? "Generar otros gráficos" : "Generar gráficos con IA"}
           </button>
           {keyVisual.status !== "working" && (
             <span className="text-muted">
               {keyVisual.status === "error" || keyVisual.status === "done"
                 ? keyVisual.message
-                : "Opcional: una imagen original inspirada en tu referencia, sin texto."}
+                : "Opcional: un key visual y elementos decorativos originales, en el estilo de tu referencia."}
             </span>
           )}
         </div>
       )}
-      {keyVisual?.status === "working" && uploadId && <KeyVisualProgress uploadId={uploadId} running />}
+      {keyVisual?.status === "working" && uploadId && <GraphicsProgress uploadId={uploadId} running />}
+      {keyVisual?.status === "done" && (keyVisual.keyVisualUrl || keyVisual.elements?.length) ? (
+        <div className="flex flex-wrap gap-2 pt-1">
+          {[keyVisual.keyVisualUrl, ...(keyVisual.elements ?? [])].filter(Boolean).map((src, i) => (
+            <span key={src} className={`flex h-16 w-16 items-center justify-center border-[1.5px] border-ink bg-surface p-1 ${i === 0 && keyVisual.keyVisualUrl ? "w-20" : ""}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src!} alt={i === 0 && keyVisual.keyVisualUrl ? "Key visual" : "Elemento"} className="max-h-full max-w-full object-contain [image-rendering:pixelated]" />
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
+}
+
+/** Pide los gráficos con IA (key visual + elementos) para una subida y devuelve el estado resultante. */
+export async function requestGraphics(uploadId: string): Promise<KeyVisualState> {
+  try {
+    const res = await fetch(`/api/reference/${uploadId}/graphics`, { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? "No se pudieron generar los gráficos");
+    const parts = [
+      data.keyVisual ? `key visual con ${data.keyVisual.provider === "comfyui" ? "ComfyUI" : "Gemini"}` : null,
+      data.elements.length ? `${data.elements.length} elementos` : null,
+    ].filter(Boolean);
+    return {
+      status: "done",
+      version: Date.now(),
+      keyVisualUrl: data.keyVisual?.url ?? null,
+      elements: data.elements,
+      message: `Listo: ${parts.join(" y ")}. Ya se ven en la vista previa.`,
+    };
+  } catch (err) {
+    return { status: "error", message: err instanceof Error ? err.message : String(err) };
+  }
 }

@@ -33,6 +33,7 @@ export type GenerateInput = {
   repoRoot: string;
   outDir: string; // carpeta absoluta de salida (se vacía antes de generar)
   keyVisualPath?: string;
+  elementPaths?: string[]; // elementos decorativos generados para el estilo
   onProgress?: (done: number, total: number, label: string) => void | Promise<void>;
 };
 
@@ -44,7 +45,12 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
   const t0 = Date.now();
   const ctx: RenderContext = {
     kit,
-    assets: await resolveAssets(kit, { kind: "inline", brandDir: join(repoRoot, "brand"), keyVisualPath: input.keyVisualPath }),
+    assets: await resolveAssets(kit, {
+      kind: "inline",
+      brandDir: join(repoRoot, "brand"),
+      keyVisualPath: input.keyVisualPath,
+      elementPaths: input.elementPaths,
+    }),
   };
 
   await rm(outDir, { recursive: true, force: true });

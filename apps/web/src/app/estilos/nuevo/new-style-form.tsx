@@ -4,7 +4,7 @@ import { useActionState, useRef, useState } from "react";
 import { PreviewFrame } from "@/components/preview-frame";
 import { PixelLoader } from "@/components/processing";
 import { AnalysisProgress } from "@/components/progress-views";
-import { ReferencePanel, type KeyVisualState, type ReferenceReading } from "@/components/reference-panel";
+import { ReferencePanel, requestGraphics, type KeyVisualState, type ReferenceReading } from "@/components/reference-panel";
 import { createStyleAction, type StyleFormState } from "../actions";
 
 type Upload = { uploadId: string; images: string[]; reference: ReferenceReading | null; referenceError: string | null };
@@ -48,20 +48,10 @@ export function NewStyleForm() {
   }
 
   async function onGenerateKeyVisual() {
-    if (!upload) return;
+    const id = upload?.uploadId;
+    if (!id) return;
     setKeyVisual({ status: "working" });
-    try {
-      const res = await fetch(`/api/reference/${upload.uploadId}/keyvisual`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "No se pudo generar el key visual");
-      setKeyVisual({
-        status: "done",
-        version: Date.now(),
-        message: `Listo con ${data.provider === "comfyui" ? "ComfyUI (local)" : "Gemini"} en ${Math.round(data.seconds)} s.`,
-      });
-    } catch (err) {
-      setKeyVisual({ status: "error", message: err instanceof Error ? err.message : String(err) });
-    }
+    setKeyVisual(await requestGraphics(id));
   }
 
   const current = PIECES.find((p) => p.id === piece)!;
@@ -71,7 +61,9 @@ export function NewStyleForm() {
         style: "referencia",
         ref: upload.uploadId,
         piece,
-        ...(keyVisual.status === "done" ? { kv: "1", v: String(keyVisual.version) } : {}),
+        ...(keyVisual.status === "done" ? { v: String(keyVisual.version) } : {}),
+        ...(keyVisual.status === "done" && keyVisual.keyVisualUrl ? { kv: "1" } : {}),
+        ...(keyVisual.status === "done" && keyVisual.elements?.length ? { el: "1" } : {}),
       })}`
     : null;
 

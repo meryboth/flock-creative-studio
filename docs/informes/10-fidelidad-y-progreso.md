@@ -46,3 +46,14 @@ Antes, mientras se procesaba, solo había un texto ("mirando…").
 - **Vistas previas:** loader mientras carga cada iframe.
 
 **Contratiempo:** el servidor de desarrollo no recompiló el CSS después de agregar reglas al final de `globals.css`. Se diagnosticó revisando la hoja compilada: terminaba en la última regla anterior al cambio. Se resolvió reiniciando el servidor.
+
+## Calidad de los gráficos (segunda vuelta)
+
+Con Gemini Image activo se pudo subir la calidad de todo lo visual:
+
+- **Proveedor principal:** Gemini Image recibe la referencia como imagen, sigue mejor las instrucciones y tarda ~12 s (SDXL local ~150 s). ComfyUI queda como respaldo (D33).
+- **Sprites de código con oficio:** los motivos sin IA pasaron de formas planas a sprites con regiones (por ejemplo, pétalos y centro), contorno de 1 px en tinta, luz arriba a la izquierda y sombra abajo a la derecha.
+- **Elementos gráficos generados:** al leer la referencia, el modelo propone 3 o 4 elementos decorativos genéricos (flor, corazón, nube, monitor…). "Generar gráficos con IA" los crea en paralelo con el key visual (~17 s en total), en el estilo exacto de la referencia; se recortan y se pixelan si corresponde. Reemplazan a los sprites de código y se guardan con el estilo de la biblioteca y con cada evento.
+- **Variedad en la familia:** si hay key visual y elementos, cada pieza usa uno u otro según la pieza.
+- **No copiar contenido de la referencia:** Gemini copió la mascota de la referencia (un dinosaurio en patineta). Ahora el prompt de imagen prohíbe reproducir personajes, mascotas, objetos o composiciones de las imágenes adjuntas, y el sujeto del key visual tiene que ser de un tipo distinto. Con la misma referencia, el resultado pasó a ser un control de videojuego pixel art.
+- **Texto negro de verdad:** un texto muy oscuro y casi sin color se normaliza a negro (el extractor lo confundía con sombras del rosa).
