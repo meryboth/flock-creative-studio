@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { PixelLoader } from "./processing";
 import { SCHEDULE_SLACK_EVENT } from "./slack-scheduler";
 
-export type StudioPiece = { file: string; url: string; kind: "png" | "txt" | "html" | "pdf"; label: string; text?: string; previewUrl?: string; badge?: string };
+export type StudioPiece = { file: string; url: string; kind: "png" | "txt" | "html" | "pdf"; label: string; text?: string; previewUrl?: string; badge?: string; review?: string[] };
 // toolbar: accionables del grupo (programar publicaciones, descargar, sincronizar nómina)
 export type StudioGroup = { id: string; title: string; pieces: StudioPiece[]; toolbar?: React.ReactNode };
 export type StudioHistoryItem = { id: string; message: string; reply: string | null; operations: string[]; status: string; pieceLabel?: string };
@@ -156,6 +156,16 @@ export function Studio({ eventId, groups, history, running }: { eventId: string;
                         )}
                       </div>
                     </button>
+                    {p.review && (
+                      <div role="note" className="mt-2 border-l-[3px] border-orange bg-orange/10 px-2.5 py-1.5 text-xs">
+                        <p className="label-mono text-orange">revisar</p>
+                        <ul className="mt-0.5 space-y-0.5">
+                          {p.review.map((r) => (
+                            <li key={r}>{r}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between gap-2 px-1 pb-1 pt-2.5">
                       <span className="flex min-w-0 items-center gap-2">
                         {p.badge && <span className="sticker shrink-0 bg-mint text-[11px]">{p.badge}</span>}

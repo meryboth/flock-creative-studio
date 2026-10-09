@@ -12,7 +12,7 @@ import { connectorStatus, knownSlackChannels, publishingPlan, slackPieces, slack
 import { describeOperation, listChanges } from "@/lib/editor";
 import { listPieces, readText, storageUrl } from "@/lib/pieces";
 import type { EditOperation } from "@flock/agents";
-import { OUTPUTS, outputsOf } from "@flock/studio";
+import { OUTPUTS, outputsOf, type PieceCheck } from "@flock/studio";
 import type { schema } from "@flock/db";
 import { getEvent, lastRosterUrl, type RosterInfo, type StyleChoice } from "@/lib/studio";
 import { newVariantAction, rewriteCopyAction } from "./actions";
@@ -163,6 +163,7 @@ async function StudioSection({ event, pieces, running }: { event: EventRow; piec
               text: kind === "txt" ? await readText(`${eventId}/${file}`).catch(() => "") : undefined,
               previewUrl: kind === "html" ? url.replace("index.html", "preview-desktop.png") : undefined,
               badge: badges.get(file.replace(/-(square|landscape)\.png$|\.(png|txt)$/, "")),
+              review: reviewNotes(p.qaReport as PieceCheck | null),
             };
           }),
       ),
@@ -192,6 +193,17 @@ async function StudioSection({ event, pieces, running }: { event: EventRow; piec
       running={running}
     />
   );
+}
+
+/** Lo que el control de calidad dejó para revisar, en frases cortas. */
+function reviewNotes(check: PieceCheck | null) {
+  if (!check) return undefined;
+  const STATUS = { cortado: "se ve cortado", falta: "no aparece", distinto: "no coincide" } as const;
+  const notes = [
+    ...check.issues.map((i) => `Texto ${i.kind === "recortado" ? "recortado" : "fuera de la pieza"}: «${i.text}»`),
+    ...(check.reading ?? []).map((f) => `${f.field} ${STATUS[f.status as keyof typeof STATUS] ?? f.status}: se lee «${f.read || "—"}», debería decir «${f.expected}»`),
+  ];
+  return notes.length ? notes : undefined;
 }
 
 /** "Se viene" / "En vivo" / "Después" para las piezas de LinkedIn y Slack (clave: ruta sin formato ni extensión). */

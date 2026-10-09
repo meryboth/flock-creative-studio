@@ -1,9 +1,10 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { promisify } from "node:util";
-import { closeRenderer, renderFullPage, renderPdf, renderPng } from "@flock/renderer";
+import { llmProviders, verifyPieceReading, type ExpectedField, type FieldCheck } from "@flock/agents";
+import { closeRenderer, renderFullPage, renderPdf, renderPngChecked, type RenderIssue } from "@flock/renderer";
 import { OUTPUT_IDS, type OutputId } from "./outputs";
 import {
   agendaSlide,
@@ -38,12 +39,23 @@ export type GenerateInput = {
   keyVisualPath?: string;
   elementPaths?: string[]; // elementos decorativos generados para el estilo
   outputs?: OutputId[]; // grupos a generar (por defecto, todos)
+  // Verificador de lectura con visión sobre una muestra de piezas (por defecto, si hay un LLM configurado)
+  verifyReading?: boolean;
   // Ajustes por pieza (editor conversacional). `file` es la ruta relativa de la pieza, ej. "linkedin/anuncio-square.png"
   adjust?: (piece: { file: string; type: PieceType }) => PieceAdjust | undefined;
   onProgress?: (done: number, total: number, label: string) => void | Promise<void>;
 };
 
-export type GenerateResult = { pieces: GeneratedPiece[]; qaReport: string; seconds: number };
+/** Control de calidad de una pieza: geométrico (todas) y de lectura (una muestra). */
+export type PieceCheck = { issues: RenderIssue[]; autoFixed: number; reading?: FieldCheck[] };
+
+export type GenerateResult = {
+  pieces: GeneratedPiece[];
+  qaReport: string;
+  seconds: number;
+  checks: Record<string, PieceCheck>; // clave: ruta de la pieza; solo las que tienen algo para revisar o se corrigieron solas
+  verified: number; // piezas que leyó el verificador
+};
 
 /** Ajuste de una pieza pedido en el editor: otro kit (colores, fuentes) y/o opciones de plantilla. */
 export type PieceAdjust = { kit?: EventKit; options?: PieceOptions };
@@ -103,16 +115,35 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
     await input.onProgress?.(++done, total, piece.label);
   };
 
+  const checks: Record<string, PieceCheck> = {};
+  const toVerify: { path: string; expected: ExpectedField[] }[] = [];
+  /**
+   * Renderiza una pieza con control geométrico: si algún texto queda recortado o fuera del lienzo,
+   * la vuelve a generar con el título más chico (hasta dos veces) y registra lo que quede.
+   */
+  const shoot = async (template: string, path: string, type: PieceType, size: { width: number; height: number }, render: (c: RenderContext) => string) => {
+    let c = await ctxFor(path, type);
+    for (let attempt = 0; ; attempt++) {
+      const html = render(c);
+      const { png, issues } = await renderPngChecked(html, size);
+      if (!issues.length || attempt === 2) {
+        sample(template, html);
+        if (issues.length || attempt) checks[path] = { issues, autoFixed: attempt };
+        return png;
+      }
+      c = { ...c, options: { ...c.options, titleScale: (c.options?.titleScale ?? 1) * 0.85 } };
+    }
+  };
+
   try {
     // LinkedIn: cada post en cuadrado y apaisado + el texto
     for (const post of linkedin) {
       for (const format of ["square", "landscape"] as LinkedInFormat[]) {
         const path = `linkedin/${post.id}-${format}.png`;
-        const html = sample(`linkedin-${format}`, linkedinPost.render(await ctxFor(path, "linkedin"), post, format));
-        await save(
-          { type: "linkedin", template: `linkedin-${format}`, label: `${post.headline} (${format === "square" ? "cuadrado" : "apaisado"})`, path },
-          await renderPng(html, linkedinPost.sizes[format]),
-        );
+        const png = await shoot(`linkedin-${format}`, path, "linkedin", linkedinPost.sizes[format], (c) => linkedinPost.render(c, post, format));
+        await save({ type: "linkedin", template: `linkedin-${format}`, label: `${post.headline} (${format === "square" ? "cuadrado" : "apaisado"})`, path }, png);
+        if (format === "square" && post === linkedin[0])
+          toVerify.push({ path, expected: [{ field: "titular", value: post.headline }, { field: "fecha", value: kit.event.dateLabel }] });
       }
       await save({ type: "linkedin-text", template: "linkedin-text", label: `Texto: ${post.headline}`, path: `linkedin/${post.id}.txt` }, post.post);
     }
@@ -120,8 +151,11 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
     // Slack: imagen apaisada (se lee bien en el canal) + el texto del mensaje
     for (const msg of slack) {
       const path = `slack/${msg.id}.png`;
-      const html = sample("slack", linkedinPost.render(await ctxFor(path, "slack"), { id: `slack-${msg.id}`, headline: msg.headline, body: msg.body, post: msg.text }, "landscape"));
-      await save({ type: "slack", template: "slack", label: `Slack: ${msg.headline}`, path }, await renderPng(html, linkedinPost.sizes.landscape));
+      const png = await shoot("slack", path, "slack", linkedinPost.sizes.landscape, (c) =>
+        linkedinPost.render(c, { id: `slack-${msg.id}`, headline: msg.headline, body: msg.body, post: msg.text }, "landscape"),
+      );
+      await save({ type: "slack", template: "slack", label: `Slack: ${msg.headline}`, path }, png);
+      if (msg === slack[0]) toVerify.push({ path, expected: [{ field: "titular", value: msg.headline }] });
       await save({ type: "slack-text", template: "slack-text", label: `Mensaje: ${msg.headline}`, path: `slack/${msg.id}.txt` }, msg.text);
     }
 
@@ -129,16 +163,27 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
     if (agenda.length) {
       for (const [i, item] of agenda.entries()) {
         const path = `cronograma/${String(i + 1).padStart(2, "0")}-${slugify(item.title)}.png`;
-        const html = sample("agenda-slide", agendaSlide.render(await ctxFor(path, "agenda-slide"), item, i));
-        await save(
-          { type: "agenda-slide", template: "agenda-slide", label: `${item.start} ${item.title}`, path },
-          await renderPng(html, agendaSlide.size),
-        );
+        const png = await shoot("agenda-slide", path, "agenda-slide", agendaSlide.size, (c) => agendaSlide.render(c, item, i));
+        await save({ type: "agenda-slide", template: "agenda-slide", label: `${item.start} ${item.title}`, path }, png);
+        // Los horarios son el dato más delicado: se verifican todas las slides
+        toVerify.push({
+          path,
+          expected: [
+            { field: "hora de inicio", value: item.start },
+            ...(item.end ? [{ field: "hora de fin", value: item.end }] : []),
+            { field: "título", value: item.title },
+          ],
+        });
       }
-      await save(
-        { type: "agenda-summary", template: "agenda-summary", label: "Cronograma completo", path: "cronograma/resumen.png" },
-        await renderPng(sample("agenda-summary", agendaSummary.render(await ctxFor("cronograma/resumen.png", "agenda-summary"), agenda)), agendaSummary.size),
-      );
+      const summary = await shoot("agenda-summary", "cronograma/resumen.png", "agenda-summary", agendaSummary.size, (c) => agendaSummary.render(c, agenda));
+      await save({ type: "agenda-summary", template: "agenda-summary", label: "Cronograma completo", path: "cronograma/resumen.png" }, summary);
+      toVerify.push({
+        path: "cronograma/resumen.png",
+        expected: agenda.slice(0, 4).flatMap((it, i) => [
+          { field: `horario ${i + 1}`, value: it.end ? `${it.start} – ${it.end}` : it.start },
+          { field: `bloque ${i + 1}`, value: it.title },
+        ]),
+      });
     }
 
     // Credenciales (PNG a 300 dpi + PDF A4 3×3) y certificados
@@ -146,9 +191,13 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
     // Credencial impresa solo para quien va presencial (o si la nómina no dice cómo asiste)
     for (const person of badgePeople) {
       const path = `credenciales/${slugify(`${person.firstName}-${person.lastName}`)}.png`;
-      const png = await renderPng(sample("badge", badge.render(await ctxFor(path, "badge"), person)), badge.size);
+      const png = await shoot("badge", path, "badge", badge.size, (c) => badge.render(c, person));
       badgePngs.push(png);
       await save({ type: "badge", template: "badge", label: `${person.firstName} ${person.lastName}`, path }, png);
+      // la credencial con el nombre más largo es la que más riesgo tiene de cortarse
+      const longest = [...badgePeople].sort((a, b) => `${b.firstName} ${b.lastName}`.length - `${a.firstName} ${a.lastName}`.length)[0];
+      if (person === longest)
+        toVerify.push({ path, expected: [{ field: "nombre", value: person.firstName }, { field: "apellido", value: person.lastName }] });
     }
     for (let i = 0; i < badgePngs.length; i += 9) {
       const uris = badgePngs.slice(i, i + 9).map((b) => `data:image/png;base64,${b.toString("base64")}`);
@@ -159,10 +208,9 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
     }
     for (const person of certPeople) {
       const path = `certificados/${slugify(`${person.firstName}-${person.lastName}`)}.png`;
-      await save(
-        { type: "certificate", template: "certificate", label: `${person.firstName} ${person.lastName}`, path },
-        await renderPng(sample("certificate", certificate.render(await ctxFor(path, "certificate"), person)), certificate.size),
-      );
+      const png = await shoot("certificate", path, "certificate", certificate.size, (c) => certificate.render(c, person));
+      await save({ type: "certificate", template: "certificate", label: `${person.firstName} ${person.lastName}`, path }, png);
+      if (person === certPeople[0]) toVerify.push({ path, expected: [{ field: "nombre completo", value: `${person.firstName} ${person.lastName}` }] });
     }
 
     // Landing autocontenida + capturas de control
@@ -176,6 +224,25 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
     await closeRenderer();
   }
 
+  // Verificador de lectura: un modelo con visión lee la muestra y compara con los datos reales
+  let verified = 0;
+  if (input.verifyReading !== false && toVerify.length && llmProviders().length) {
+    const queue = [...toVerify];
+    const worker = async () => {
+      for (let item = queue.shift(); item; item = queue.shift()) {
+        try {
+          const result = await verifyPieceReading(await readFile(join(outDir, item.path)), item.expected);
+          verified++;
+          if (!result.ok) checks[item.path] = { ...(checks[item.path] ?? { issues: [], autoFixed: 0 }), reading: result.fields.filter((f) => f.status !== "ok") };
+        } catch (err) {
+          console.warn(`[verificador] ${item.path}: ${err instanceof Error ? err.message : err}`);
+        }
+      }
+    };
+    await input.onProgress?.(done, total, "Verificando la lectura de las piezas");
+    await Promise.all(Array.from({ length: 4 }, worker));
+  }
+
   const qaReport = await designQa(repoRoot, join(outDir, "qa"), qaSamples);
   // Reemplaza solo las carpetas de piezas: inputs/ (key visual, elementos) queda intacta.
   // Los grupos que se sacaron del evento se borran.
@@ -186,7 +253,7 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
     await rename(join(outDir, folder), join(input.outDir, folder));
   }
   await rm(outDir, { recursive: true, force: true });
-  return { pieces, qaReport, seconds: (Date.now() - t0) / 1000 };
+  return { pieces, qaReport, seconds: (Date.now() - t0) / 1000, checks, verified };
 }
 
 // Pasa el detector de Impeccable (anti-patrones de diseño, a11y) por una pieza de cada plantilla.

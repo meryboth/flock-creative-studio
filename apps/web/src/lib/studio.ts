@@ -176,14 +176,28 @@ export async function runGeneration(eventId: string, { rewriteCopy = true } = {}
       const [kitRow] = await tx.insert(schema.eventKits).values({ eventId, kit }).returning({ id: schema.eventKits.id });
       await tx.delete(schema.pieces).where(eq(schema.pieces.eventId, eventId));
       await tx.insert(schema.pieces).values(
-        result.pieces.map((p) => ({ eventId, eventKitId: kitRow.id, type: p.type, template: p.template, data: { label: p.label }, file: p.file })),
+        result.pieces.map((p) => {
+          // Control de calidad: problemas que quedaron (texto recortado, lectura distinta) y correcciones automáticas
+          const check = result.checks[p.file];
+          const pending = check ? check.issues.length + (check.reading?.length ?? 0) : 0;
+          return {
+            eventId,
+            eventKitId: kitRow.id,
+            type: p.type,
+            template: p.template,
+            data: { label: p.label },
+            file: p.file,
+            qaScore: pending ? 0 : 1,
+            qaReport: check ?? null,
+          };
+        }),
       );
       await tx.update(schema.events).set({ status: "done" }).where(eq(schema.events.id, eventId));
     });
     const [{ contentSource }] = await db.select({ contentSource: schema.events.contentSource }).from(schema.events).where(eq(schema.events.id, eventId));
     await update({
       status: "done",
-      stage: `Piezas generadas en ${result.seconds.toFixed(0)} s · QA de diseño: ${result.qaReport.split("\n").pop()}`,
+      stage: `Piezas generadas en ${result.seconds.toFixed(0)} s · ${qaSummary(result)} · QA de diseño: ${result.qaReport.split("\n").pop()}`,
       error: contentSource === "fallback" ? lastCopyError : null,
     });
   } catch (err) {
@@ -261,4 +275,18 @@ export async function lastRosterUrl() {
 export async function setOutputs(eventId: string, outputs: OutputId[]) {
   if (!outputs.length) throw new Error("Elegí al menos un tipo de pieza");
   await db.update(schema.events).set({ outputs, status: "producing" }).where(eq(schema.events.id, eventId));
+}
+
+/** Resumen del control de calidad para la línea de estado del evento. */
+function qaSummary(result: { checks: Record<string, { issues: unknown[]; autoFixed: number; reading?: unknown[] }>; verified: number }) {
+  const checks = Object.values(result.checks);
+  const review = checks.filter((c) => c.issues.length || c.reading?.length).length;
+  const fixed = checks.filter((c) => c.autoFixed && !c.issues.length).length;
+  return [
+    review ? `${review} ${review === 1 ? "pieza" : "piezas"} para revisar` : "control de lectura sin problemas",
+    fixed ? `${fixed} ajustadas solas` : "",
+    result.verified ? `${result.verified} leídas por el verificador` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
