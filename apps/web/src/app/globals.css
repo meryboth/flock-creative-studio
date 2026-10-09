@@ -202,3 +202,32 @@ select {
   background: var(--surface);
   padding: 0.15rem 0.7rem;
 }
+
+/* ─── Progreso: loader pixel y barra rayada ─────────────────────────────── */
+@keyframes pixel-blink {
+  0%, 100% { opacity: 0.18; }
+  40% { opacity: 1; }
+}
+.pixel-loader {
+  display: inline-grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+}
+.pixel-loader span {
+  width: 100%;
+  aspect-ratio: 1;
+  animation: pixel-blink 1.1s steps(2, jump-none) infinite;
+}
+@keyframes stripes {
+  to { background-position: 28px 0; }
+}
+.bar-indeterminate {
+  background: repeating-linear-gradient(-45deg, var(--yellow) 0 8px, var(--ink) 8px 14px);
+  animation: stripes 0.8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pixel-loader span,
+  .bar-indeterminate {
+    animation: none;
+  }
+}

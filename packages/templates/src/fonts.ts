@@ -36,6 +36,13 @@ export const FONT_CATALOG: Record<string, FontEntry> = {
   },
   Figtree: { pkg: "@fontsource-variable/figtree", file: (s) => `figtree-${s}-wght-normal.woff2`, weight: "300 900", format: "woff2" },
   Gloock: { pkg: "@fontsource/gloock", file: (s) => `gloock-${s}-400-normal.woff2`, weight: "400", format: "woff2" },
+  "Pixelify Sans": { pkg: "@fontsource-variable/pixelify-sans", file: (s) => `pixelify-sans-${s}-wght-normal.woff2`, weight: "400 700", format: "woff2" },
+  // Silkscreen solo tiene 400 y 700: se usa la negrita para todos los pesos
+  Silkscreen: { pkg: "@fontsource/silkscreen", file: (s) => `silkscreen-${s}-700-normal.woff2`, weight: "400 900", format: "woff2" },
+  Caveat: { pkg: "@fontsource-variable/caveat", file: (s) => `caveat-${s}-wght-normal.woff2`, weight: "400 700", format: "woff2" },
+  "Bebas Neue": { pkg: "@fontsource/bebas-neue", file: (s) => `bebas-neue-${s}-400-normal.woff2`, weight: "400 900", format: "woff2" },
+  "Instrument Serif": { pkg: "@fontsource/instrument-serif", file: (s) => `instrument-serif-${s}-400-normal.woff2`, weight: "400", format: "woff2" },
+  "JetBrains Mono": { pkg: "@fontsource-variable/jetbrains-mono", file: (s) => `jetbrains-mono-${s}-wght-normal.woff2`, weight: "100 800", format: "woff2" },
 };
 
 const SUBSETS = [

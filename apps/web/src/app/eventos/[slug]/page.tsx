@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { STYLES } from "@flock/templates";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { GenerationProgress } from "@/components/progress-views";
 import { listPieces, readText, storageUrl } from "@/lib/pieces";
 import { getEvent, type StyleChoice } from "@/lib/studio";
 import { newVariantAction, rewriteCopyAction } from "./actions";
@@ -71,16 +72,8 @@ async function EventContent({ params }: { params: PageProps<"/eventos/[slug]">["
       {running && (
         <section aria-live="polite" className="taped mb-12 -rotate-[0.4deg] border-[1.5px] border-ink bg-surface p-6 shadow-md">
           <AutoRefresh />
-          <p className="font-hand text-3xl font-bold leading-none">{run?.stage ?? "Preparando"}…</p>
-          <div className="mt-5 h-3 overflow-hidden border-[1.5px] border-ink bg-background" role="progressbar" aria-valuemin={0} aria-valuemax={run?.total || 1} aria-valuenow={run?.progress ?? 0}>
-            <div
-              className="h-full bg-yellow transition-[width] duration-500"
-              style={{ width: run?.total ? `${(run.progress / run.total) * 100}%` : "6%" }}
-            />
-          </div>
-          <p className="mt-3 text-sm text-muted">
-            {run?.total ? `${run.progress} de ${run.total} piezas` : "Gemini está escribiendo los textos; puede tardar uno o dos minutos."}
-          </p>
+          <p className="mb-5 font-hand text-3xl font-bold leading-none">generando la familia de piezas…</p>
+          <GenerationProgress stage={run?.stage ?? null} progress={run?.progress ?? 0} total={run?.total ?? 0} startedAt={run?.createdAt.getTime()} />
         </section>
       )}
 

@@ -6,7 +6,7 @@ export type StyleDef = {
   description: string;
   fonts: { display: string; body: string };
   // Tratamiento tipográfico y de componentes del estilo
-  display: { weight: number; transform: "uppercase" | "none"; tracking: string; stretch: string; leading: number };
+  display: { weight: number; transform: "uppercase" | "lowercase" | "none"; tracking: string; stretch: string; leading: number };
   radius: number; // radio de cajas; las pastillas usan 999px salvo que el estilo sea recto
   pillRadius: string;
   stroke: number;
@@ -94,7 +94,21 @@ export const STYLES: Record<StyleId, StyleDef> = {
 export const STYLE_LIST = Object.values(STYLES).filter((s) => s.id !== "referencia");
 
 // Pesos disponibles por familia (Gloock solo tiene 400)
-const MAX_WEIGHT: Record<string, number> = { Gloock: 400, Unbounded: 900, Archivo: 900, "Bricolage Grotesque": 800 };
+const MAX_WEIGHT: Record<string, number> = {
+  Gloock: 400,
+  Unbounded: 900,
+  Archivo: 900,
+  "Bricolage Grotesque": 800,
+  "Pixelify Sans": 700,
+  Silkscreen: 700,
+  Caveat: 700,
+  "Bebas Neue": 400,
+  "Instrument Serif": 400,
+  "JetBrains Mono": 800,
+};
+
+// Familias display que dibujan mal números o "#": horarios y hashtag van con la fuente de cuerpo
+const WEAK_NUMERALS = new Set(["Gloock", "Instrument Serif", "Caveat"]);
 
 /** Estilo efectivo de un kit: el del catálogo o el derivado de la referencia. */
 export function resolveStyle(kit: EventKit): StyleDef {
@@ -114,7 +128,7 @@ export function styleFromReference(ref: ReferenceStyle): StyleDef {
     fonts: { display: t.display, body: t.body },
     display: {
       weight,
-      transform: t.case === "upper" ? "uppercase" : "none",
+      transform: t.case === "upper" ? "uppercase" : t.case === "lower" ? "lowercase" : "none",
       tracking: t.case === "upper" ? "0.01em" : "-0.02em",
       // solo las familias con eje de ancho (Archivo, Bricolage) lo aplican
       stretch: { condensed: "75%", normal: "100%", extended: "125%" }[t.width],
@@ -122,15 +136,30 @@ export function styleFromReference(ref: ReferenceStyle): StyleDef {
     },
     radius,
     pillRadius: ref.corners === "sharp" ? "0px" : "999px",
-    ground: (p) =>
-      ref.ground === "gradient"
-        ? `radial-gradient(ellipse 85% 90% at 70% 25%, ${p.ground} 0%, ${p.groundDeep} 85%)`
-        : p.ground,
-    // Gloock dibuja mal números y "#"
+    ground: (p) => {
+      const base =
+        ref.ground === "gradient" ? `radial-gradient(ellipse 85% 90% at 70% 25%, ${p.ground} 0%, ${p.groundDeep} 85%)` : p.ground;
+      return texture(ref.texture ?? "none", p.ink) + base;
+    },
     css:
-      t.display === "Gloock"
+      WEAK_NUMERALS.has(t.display)
         ? `.canvas .hashtag, .canvas .slot b, .canvas .time { font-family: var(--font-body); font-weight: 800; letter-spacing: 0; }
 .canvas .slot .sep { font-family: var(--font-body); font-weight: 300; }`
         : undefined,
   };
+}
+
+/** Capas de textura (cuadrícula, puntos, renglones) que van delante del fondo, terminadas en coma. */
+function texture(kind: NonNullable<ReferenceStyle["texture"]>, ink: string) {
+  const line = `color-mix(in srgb, ${ink} 12%, transparent)`;
+  switch (kind) {
+    case "grid":
+      return `linear-gradient(${line} 1.5px, transparent 1.5px) 0 0 / 40px 40px, linear-gradient(90deg, ${line} 1.5px, transparent 1.5px) 0 0 / 40px 40px, `;
+    case "dots":
+      return `radial-gradient(circle, ${line.replace("12%", "30%")} 2px, transparent 2.5px) 0 0 / 32px 32px, `;
+    case "lines":
+      return `linear-gradient(transparent 38px, ${line} 40px) 0 0 / 100% 40px, `;
+    default:
+      return "";
+  }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { PixelLoader } from "./processing";
 
 /** Muestra una pieza de tamaño fijo (ej. 1200×1200) escalada al ancho de su contenedor. */
 export function PreviewFrame({ src, width, height, title }: { src: string; width: number; height: number; title: string }) {
@@ -20,6 +21,11 @@ export function PreviewFrame({ src, width, height, title }: { src: string; width
 
   return (
     <div ref={box} className="relative w-full overflow-hidden bg-[#0b0614]" style={{ aspectRatio: `${width} / ${height}` }}>
+      {!loaded && (
+        <span className="absolute inset-0 z-10 flex items-center justify-center" aria-label="Cargando vista previa">
+          <PixelLoader size={22} />
+        </span>
+      )}
       {scale > 0 && (
         <iframe
           src={src}

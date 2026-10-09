@@ -5,7 +5,13 @@ export type Language = "es" | "en";
 export type StyleId = "iridiscente" | "grilla" | "flock" | "organico" | "referencia";
 
 /** Generador del visual de cada pieza (ver visuals.tsx). */
-export type Generator = "orbs" | "grid" | "pieces" | "blobs";
+export type Generator = "orbs" | "grid" | "pieces" | "blobs" | "pixel" | "doodle";
+
+/** Motivos que dibujan los generadores "pixel" y "doodle". */
+export type Motif = "flower" | "cloud" | "heart" | "star" | "sparkle" | "squiggle";
+
+/** Textura del fondo de las piezas. */
+export type Texture = "none" | "grid" | "dots" | "lines";
 
 /**
  * Estilo derivado de una imagen de referencia (lectura con IA + colores extraídos por código).
@@ -19,11 +25,13 @@ export type ReferenceStyle = {
   typography: {
     display: string; // familia del catálogo
     body: string;
-    case: "upper" | "title";
+    case: "upper" | "title" | "lower";
     weight: "regular" | "bold" | "black";
     width: "condensed" | "normal" | "extended";
   };
   generator: Generator;
+  motifs?: Motif[];
+  texture?: Texture;
   corners: "sharp" | "soft" | "round";
   ground: "flat" | "gradient";
 };

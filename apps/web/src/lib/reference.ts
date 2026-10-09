@@ -7,7 +7,7 @@ import { UPLOADS_DIR } from "./paths";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export type StoredReference = { style: ReferenceStyle; keyVisualPrompt: string; model: string };
+export type StoredReference = { style: ReferenceStyle; keyVisualPrompt: string; medium?: string; model: string };
 
 /** Carpeta de una subida de moodboard (valida el id para no salir de uploads/). */
 export function uploadDir(uploadId: string) {

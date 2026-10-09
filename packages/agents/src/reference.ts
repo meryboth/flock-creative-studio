@@ -8,8 +8,21 @@ import { analyzeMoodboard } from "./moodboard";
 const HEX = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
 // Catálogo cerrado: el modelo elige, no inventa
-const DISPLAY_FONTS = ["Unbounded", "Archivo", "Bricolage Grotesque", "Gloock"] as const;
-const BODY_FONTS = ["Manrope", "Figtree", "Archivo"] as const;
+const DISPLAY_FONTS = [
+  "Unbounded",
+  "Archivo",
+  "Bricolage Grotesque",
+  "Gloock",
+  "Pixelify Sans",
+  "Silkscreen",
+  "Caveat",
+  "Bebas Neue",
+  "Instrument Serif",
+  "JetBrains Mono",
+] as const;
+const BODY_FONTS = ["Manrope", "Figtree", "Archivo", "JetBrains Mono"] as const;
+const MOTIFS = ["flower", "cloud", "heart", "star", "sparkle", "squiggle"] as const;
+const MEDIUMS = ["3d-render", "pixel-art", "flat-vector", "hand-drawn", "photo", "abstract-gradient"] as const;
 
 const ReferenceSchema = z.object({
   description: z.string().describe("Qué se ve en la referencia y qué la hace reconocible, en 1 o 2 oraciones en español"),
@@ -25,39 +38,63 @@ const ReferenceSchema = z.object({
   typography: z.object({
     display: z.enum(DISPLAY_FONTS),
     body: z.enum(BODY_FONTS),
-    case: z.enum(["upper", "title"]),
+    case: z.enum(["upper", "title", "lower"]),
     weight: z.enum(["regular", "bold", "black"]),
     width: z.enum(["condensed", "normal", "extended"]),
   }),
-  generator: z.enum(["orbs", "grid", "pieces", "blobs"]),
+  generator: z.enum(["orbs", "grid", "pieces", "blobs", "pixel", "doodle"]),
+  motifs: z.array(z.enum(MOTIFS)).max(4).describe("Motivos que aparecen o encajan con la referencia (solo para pixel o doodle)"),
+  texture: z.enum(["none", "grid", "dots", "lines"]).describe("Textura del fondo: cuadrícula, puntos, renglones o liso"),
   corners: z.enum(["sharp", "soft", "round"]),
   ground: z.enum(["flat", "gradient"]),
-  keyVisualPrompt: z.string().describe("En inglés: descripción de un visual abstracto original inspirado en la referencia, sin texto ni logos"),
+  medium: z.enum(MEDIUMS).describe("Técnica visual dominante de la referencia"),
+  keyVisualPrompt: z
+    .string()
+    .describe(
+      "En inglés, empezando por la técnica (ej. 'pixel art of …', '3D render of …', 'flat vector illustration of …'): UN sujeto ORIGINAL, simple y fácil de leer (un objeto o personaje), que encaje con el clima de la referencia y con un evento de tecnología. No describas el fondo. No copies personajes, mascotas ni logos de la referencia. Sin texto.",
+    ),
 });
 
-export type ReferenceAnalysis = { style: ReferenceStyle; keyVisualPrompt: string; model: string; extractedColors: string[] };
+export type ReferenceAnalysis = {
+  style: ReferenceStyle;
+  keyVisualPrompt: string;
+  medium: (typeof MEDIUMS)[number];
+  model: string;
+  extractedColors: string[];
+};
 
 const PROMPT = (swatches: string[], background: string) => `Sos director de arte. Esta imagen es una REFERENCIA de estilo para las piezas gráficas de un evento interno de una empresa de tecnología (posteos, cronograma, credenciales, landing).
 
 Analizala y traducí su estilo a nuestro sistema, eligiendo SOLO entre estas opciones:
 
-Tipografía display (títulos):
+Tipografía display (títulos), elegí la que mejor reproduzca la letra de la referencia:
 - "Unbounded": geométrica muy ancha y redonda, tecnológica, impacto.
-- "Archivo": grotesca neutra con eje de ancho (sirve para condensada, normal o extendida), editorial, suiza.
+- "Archivo": grotesca neutra con eje de ancho (condensada, normal o extendida), editorial, suiza.
 - "Bricolage Grotesque": grotesca con carácter y algo de irregularidad, cercana, contemporánea.
 - "Gloock": serif display de alto contraste, elegante, editorial, cálida.
-Tipografía de texto: "Manrope" (neutra técnica), "Figtree" (amable, geométrica) o "Archivo" (neutra).
+- "Instrument Serif": serif editorial fina y condensada, moderna.
+- "Pixelify Sans": pixel / 8-bit redondeada, videojuego, retro digital.
+- "Silkscreen": pixel / bitmap muy marcada, ancha, en mayúsculas, retro computadora.
+- "Bebas Neue": condensada de afiche, alta y en mayúsculas.
+- "Caveat": manuscrita, informal, notas a mano.
+- "JetBrains Mono": monoespaciada, código, terminal.
+Tipografía de texto: "Manrope" (neutra técnica), "Figtree" (amable), "Archivo" (neutra) o "JetBrains Mono" (código, retro digital).
 
 Visual de las piezas (generator):
 - "orbs": esferas de luz desenfocadas, brillo, profundidad (estéticas oscuras, glow, 3D iridiscente, gradientes).
 - "grid": formas geométricas planas sobre grilla (Bauhaus, suizo, constructivista, bloques de color).
 - "blobs": formas orgánicas suaves superpuestas (naturaleza, ilustración plana, cercanía).
 - "pieces": formas lineales con degradado, contornos (solo si la referencia usa trazos o contornos).
+- "pixel": motivos en pixel art (flores, nubes, corazones, estrellas) — estéticas 8-bit, retro, videojuego.
+- "doodle": motivos dibujados a mano con trazo (flores, estrellas, garabatos) — estéticas lúdicas, de cuaderno, ilustración a mano.
+Si usás "pixel" o "doodle", elegí hasta 4 motivos: flower, cloud, heart, star, sparkle, squiggle.
+
+Fondo: indicá si tiene textura (cuadrícula "grid", puntos "dots", renglones "lines" o liso "none").
 
 Colores medidos por código en la imagen (son exactos):
 - Color que más superficie ocupa, casi seguro el fondo: ${background}
 - Colores característicos: ${swatches.join(", ")}
-Usá ${background} como ground salvo que la imagen claramente tenga otro fondo. El texto (ink) tiene que leerse bien sobre el fondo.
+Usá ${background} como ground salvo que la imagen claramente tenga otro fondo. Para ink usá el color real de los títulos de la referencia (si son negros, #111111; si son blancos, #ffffff) y que se lea bien sobre el fondo.
 
 Indicá también si las esquinas son rectas, suaves o redondas, si el fondo es plano o con degradado, y escribí en inglés un prompt para generar un visual abstracto original inspirado en la referencia (materiales, luz, formas, paleta), sin texto, sin letras y sin logos.`;
 
@@ -79,10 +116,11 @@ export async function analyzeReference(files: string[]): Promise<ReferenceAnalys
   const errors: string[] = [];
   for (const model of models) {
     try {
-      const llm = new ChatGoogleGenerativeAI({ model, apiKey, temperature: 0.4, maxRetries: 1 });
+      // Temperatura baja: la misma referencia tiene que dar (casi) la misma lectura
+      const llm = new ChatGoogleGenerativeAI({ model, apiKey, temperature: 0.15, maxRetries: 1 });
       const out = await llm.withStructuredOutput(ReferenceSchema, { name: "reference_style" }).invoke([message], { signal: AbortSignal.timeout(60_000) });
-      const { keyVisualPrompt, ...style } = out;
-      return { style, keyVisualPrompt, model, extractedColors: measured.colors };
+      const { keyVisualPrompt, medium, ...style } = out;
+      return { style, keyVisualPrompt, medium, model, extractedColors: measured.colors };
     } catch (err) {
       errors.push(`${model}: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
     }

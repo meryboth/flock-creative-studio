@@ -2,6 +2,7 @@
 
 import { useActionState, useDeferredValue, useMemo, useRef, useState } from "react";
 import { PreviewFrame } from "@/components/preview-frame";
+import { AnalysisProgress } from "@/components/progress-views";
 import { ReferencePanel, type KeyVisualState, type ReferenceReading } from "@/components/reference-panel";
 import { createEventAction, type FormState } from "./actions";
 
@@ -49,7 +50,7 @@ export function NewEventForm({ styles, library, initialLibraryId }: { styles: St
   const [piece, setPiece] = useState<(typeof PIECES)[number]["id"]>("linkedin");
   const [moodboard, setMoodboard] = useState<Moodboard | null>(null);
   const [moodboardError, setMoodboardError] = useState<string | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzing, setAnalyzing] = useState<number | false>(false); // cantidad de imágenes en análisis
   const fileInput = useRef<HTMLInputElement>(null);
   const [keyVisual, setKeyVisual] = useState<KeyVisualState>({ status: "idle" });
 
@@ -100,7 +101,7 @@ export function NewEventForm({ styles, library, initialLibraryId }: { styles: St
 
   async function onMoodboard(files: FileList | null) {
     if (!files?.length) return;
-    setAnalyzing(true);
+    setAnalyzing(files.length);
     setMoodboardError(null);
     const body = new FormData();
     for (const f of Array.from(files)) body.append("files", f);
@@ -206,15 +207,20 @@ export function NewEventForm({ styles, library, initialLibraryId }: { styles: St
               <button
                 type="button"
                 onClick={() => fileInput.current?.click()}
-                disabled={analyzing}
+                disabled={analyzing !== false}
                 className="btn-line"
               >
-                {analyzing ? "Analizando…" : moodboard ? "Cambiar imágenes" : "Subir imágenes"}
+                {analyzing !== false ? "Analizando…" : moodboard ? "Cambiar imágenes" : "Subir imágenes"}
               </button>
               <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={(e) => onMoodboard(e.target.files)} />
             </div>
             {moodboardError && <p className="mt-3 text-sm text-orange">{moodboardError}</p>}
-            {moodboard && (
+            {analyzing !== false && (
+              <div className="mt-5">
+                <AnalysisProgress running images={analyzing} />
+              </div>
+            )}
+            {moodboard && analyzing === false && (
               <div className="mt-5 space-y-4">
                 <div className="flex gap-2 overflow-x-auto">
                   {moodboard.images.map((src) => (
@@ -235,7 +241,7 @@ export function NewEventForm({ styles, library, initialLibraryId }: { styles: St
                   )}
                 </div>
                 {moodboard.reference ? (
-                  <ReferencePanel reading={moodboard.reference} keyVisual={keyVisual} onGenerateKeyVisual={onGenerateKeyVisual} />
+                  <ReferencePanel reading={moodboard.reference} keyVisual={keyVisual} onGenerateKeyVisual={onGenerateKeyVisual} uploadId={moodboard.uploadId} />
                 ) : (
                   moodboard.referenceError && <p className="text-sm text-muted">No pudimos leer el estilo con IA; usamos solo los colores. ({moodboard.referenceError})</p>
                 )}

@@ -1,6 +1,7 @@
 /** @jsxRuntime automatic @jsxImportSource @flock/templates */
 import type { Html } from "./jsx-runtime.js";
 import type { Generator, RenderContext } from "./kit.js";
+import { DoodleMotif, layoutMotifs, PixelMotif } from "./motifs.js";
 import { resolveStyle } from "./styles.js";
 
 // Zona donde vive el visual dentro de la pieza (puede sangrar fuera del lienzo).
@@ -233,6 +234,34 @@ function Blobs({ ctx, area, canvas, salt }: VisualProps) {
   );
 }
 
+// ─── Pixel art y dibujo a mano: motivos elegidos por la referencia ─────────
+
+function PixelArt({ ctx, area, canvas, salt }: VisualProps) {
+  const r = rng(ctx.kit.style.seed, salt);
+  return (
+    <div style={layer}>
+      <svg width={canvas.width} height={canvas.height} viewBox={`0 0 ${canvas.width} ${canvas.height}`} style={{ position: "absolute", inset: 0 }} shape-rendering="crispEdges">
+        {layoutMotifs(ctx, area, canvas, r).map((m, i) => (
+          <PixelMotif motif={m.motif} x={m.x} y={m.y} size={m.size} color={m.color} outline={m.outline} cells={i === 0 ? 20 : 16} />
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function Doodles({ ctx, area, canvas, salt }: VisualProps) {
+  const r = rng(ctx.kit.style.seed, salt);
+  return (
+    <div style={layer}>
+      <svg width={canvas.width} height={canvas.height} viewBox={`0 0 ${canvas.width} ${canvas.height}`} style={{ position: "absolute", inset: 0 }}>
+        {layoutMotifs(ctx, area, canvas, r).map((m) => (
+          <DoodleMotif motif={m.motif} x={m.x} y={m.y} size={m.size} color={m.color} rand={r} />
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 // ─── Imagen propia (opcional, en cualquier estilo) ──────────────────────────
 
 function KeyVisualImage({ ctx, area }: VisualProps) {
@@ -284,16 +313,20 @@ const GENERATORS: Record<Generator, (p: VisualProps) => Html | null> = {
   grid: GridShapes,
   pieces: BrandPieces,
   blobs: Blobs,
+  pixel: PixelArt,
+  doodle: Doodles,
 };
 
 /** Capa visual de la pieza según el estilo del kit. `salt` varía la composición entre piezas. */
 export function Backdrop(props: VisualProps) {
   const Generator = GENERATORS[resolveStyle(props.ctx.kit).generator];
-  // Con un visual completo propio (con fondo), el generador no se dibuja; con un objeto recortado, queda detrás
-  const blend = props.ctx.kit.style.keyVisual?.fit === "blend";
+  // Con un key visual propio, el generador no compite con él: solo queda el brillo de las esferas detrás de un objeto
+  const fit = props.ctx.kit.style.keyVisual?.fit;
+  const generator = resolveStyle(props.ctx.kit).generator;
+  const drawGenerator = !fit || fit === "top" || (fit === "object" && generator === "orbs");
   return (
     <>
-      {!blend && <Generator {...props} />}
+      {drawGenerator && <Generator {...props} />}
       <KeyVisualImage {...props} />
     </>
   );

@@ -135,9 +135,19 @@ export function paletteFromReference(ref: ReferenceStyle): Palette {
     accent: ref.colors.accent,
     accent2: ref.colors.accent2,
     line: ink,
-    // Las formas tienen que despegarse del fondo: si un color de la referencia es casi igual, se aclara u oscurece
-    shapes: (ref.colors.shapes.length ? ref.colors.shapes : [ref.colors.accent, ref.colors.accent2]).map((c) => separateFrom(c, ref.colors.ground)),
+    shapes: shapesFor(ref),
   };
+}
+
+/**
+ * Colores para las formas: los que se despegan del fondo. Si una referencia tiene pocos colores
+ * distintos del fondo, los demás se aclaran u oscurecen lo justo para que se vean.
+ */
+function shapesFor(ref: ReferenceStyle) {
+  const raw = ref.colors.shapes.length ? ref.colors.shapes : [ref.colors.accent, ref.colors.accent2];
+  const g = parse(ref.colors.ground);
+  const distinct = raw.filter((c) => Math.abs(parse(c).l - g.l) >= 0.12);
+  return distinct.length >= 2 ? distinct : raw.map((c) => separateFrom(c, ref.colors.ground));
 }
 
 /** Garantiza una diferencia mínima de luminosidad (OKLCH) entre un color y el fondo. */

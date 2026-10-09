@@ -2,6 +2,8 @@
 
 import { useActionState, useRef, useState } from "react";
 import { PreviewFrame } from "@/components/preview-frame";
+import { PixelLoader } from "@/components/processing";
+import { AnalysisProgress } from "@/components/progress-views";
 import { ReferencePanel, type KeyVisualState, type ReferenceReading } from "@/components/reference-panel";
 import { createStyleAction, type StyleFormState } from "../actions";
 
@@ -19,7 +21,7 @@ const SAMPLE = { name: "Evento de ejemplo", date: "2027-04-15", description: "As
 export function NewStyleForm() {
   const [state, formAction, pending] = useActionState<StyleFormState, FormData>(createStyleAction, {});
   const [upload, setUpload] = useState<Upload | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzing, setAnalyzing] = useState<number | false>(false); // cantidad de imágenes en análisis
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [keyVisual, setKeyVisual] = useState<KeyVisualState>({ status: "idle" });
   const [piece, setPiece] = useState<(typeof PIECES)[number]["id"]>("linkedin");
@@ -27,7 +29,7 @@ export function NewStyleForm() {
 
   async function onFiles(files: FileList | null) {
     if (!files?.length) return;
-    setAnalyzing(true);
+    setAnalyzing(files.length);
     setUploadError(null);
     setKeyVisual({ status: "idle" });
     const body = new FormData();
@@ -80,15 +82,15 @@ export function NewStyleForm() {
           <legend className="folder-tab label-mono bg-violet text-white">1 · referencia</legend>
           <div className="space-y-5 border-[1.5px] border-ink bg-surface/85 p-5 sm:p-7">
             <div className="flex flex-wrap items-center gap-4">
-              <button type="button" onClick={() => fileInput.current?.click()} disabled={analyzing} className="btn-ink">
-                {analyzing ? "Leyendo la referencia…" : upload ? "Cambiar imágenes" : "Subir imágenes"}
+              <button type="button" onClick={() => fileInput.current?.click()} disabled={analyzing !== false} className="btn-ink">
+                {analyzing !== false ? "Leyendo la referencia…" : upload ? "Cambiar imágenes" : "Subir imágenes"}
               </button>
               <span className="text-sm text-muted">PNG, JPG o WebP. Hasta 15 imágenes.</span>
               <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={(e) => onFiles(e.target.files)} />
             </div>
             {uploadError && <p className="text-sm text-orange">{uploadError}</p>}
-            {analyzing && <p className="font-hand text-2xl text-muted">mirando colores, tipografía y formas…</p>}
-            {upload && (
+            {analyzing !== false && <AnalysisProgress running images={analyzing} />}
+            {upload && analyzing === false && (
               <>
                 <div className="flex gap-2 overflow-x-auto">
                   {upload.images.map((src) => (
@@ -96,7 +98,9 @@ export function NewStyleForm() {
                     <img key={src} src={`/api/storage/${src}`} alt="" className="h-20 w-20 shrink-0 border-[1.5px] border-ink object-cover" />
                   ))}
                 </div>
-                {upload.reference && <ReferencePanel reading={upload.reference} keyVisual={keyVisual} onGenerateKeyVisual={onGenerateKeyVisual} />}
+                {upload.reference && (
+                  <ReferencePanel reading={upload.reference} keyVisual={keyVisual} onGenerateKeyVisual={onGenerateKeyVisual} uploadId={upload.uploadId} />
+                )}
               </>
             )}
           </div>
@@ -150,8 +154,11 @@ export function NewStyleForm() {
             <PreviewFrame src={previewUrl} width={current.width} height={current.height} title={`Ejemplo: ${current.label}`} />
           </div>
         ) : (
-          <div className="flex aspect-square items-center justify-center border-[1.5px] border-dashed border-ink bg-surface/60 p-8 text-center">
-            <p className="font-hand text-2xl text-muted">subí una referencia y acá aparece el estilo aplicado</p>
+          <div className="flex aspect-square flex-col items-center justify-center gap-4 border-[1.5px] border-dashed border-ink bg-surface/60 p-8 text-center">
+            {analyzing !== false && <PixelLoader size={40} />}
+            <p className="font-hand text-2xl text-muted">
+              {analyzing !== false ? "armando el estilo para mostrártelo aplicado…" : "subí una referencia y acá aparece el estilo aplicado"}
+            </p>
           </div>
         )}
       </aside>
