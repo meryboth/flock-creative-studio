@@ -68,6 +68,7 @@ export const events = pgTable("events", {
   roster: jsonb("roster"),
   // Cambios pedidos en el editor conversacional (Overrides de @flock/studio)
   overrides: jsonb("overrides"),
+  outputs: jsonb("outputs"), // grupos de piezas a generar (null: todos, eventos anteriores a la opción)
   status: eventStatus("status").notNull().default("exploring"),
   brandKitId: uuid("brand_kit_id").references(() => brandKits.id),
   createdAt: createdAt(),
@@ -175,6 +176,8 @@ export const attendees = pgTable(
     lastName: text("last_name").notNull(),
     area: text("area"),
     role: text("role"),
+    email: text("email"),
+    attendance: text("attendance"), // presencial | remoto (credencial impresa solo presencial)
     photo: text("photo"),
   },
   (t) => [index().on(t.eventId)],

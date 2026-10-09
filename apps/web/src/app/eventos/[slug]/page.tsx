@@ -3,6 +3,7 @@ import Link from "next/link";
 import { MOMENT_LABEL, momentOf, STYLES, type EventContent } from "@flock/templates";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { GenerationProgress } from "@/components/progress-views";
+import { OutputsPicker } from "@/components/outputs-picker";
 import { PublishPlanner } from "@/components/publish-planner";
 import { SlackScheduler } from "@/components/slack-scheduler";
 import { CredentialsActions } from "@/components/roster-sync";
@@ -11,6 +12,7 @@ import { connectorStatus, knownSlackChannels, publishingPlan, slackPieces, slack
 import { describeOperation, listChanges } from "@/lib/editor";
 import { listPieces, readText, storageUrl } from "@/lib/pieces";
 import type { EditOperation } from "@flock/agents";
+import { OUTPUTS, outputsOf } from "@flock/studio";
 import type { schema } from "@flock/db";
 import { getEvent, lastRosterUrl, type RosterInfo, type StyleChoice } from "@/lib/studio";
 import { newVariantAction, rewriteCopyAction } from "./actions";
@@ -110,6 +112,13 @@ async function EventContent({ params }: { params: PageProps<"/eventos/[slug]">["
         </p>
       )}
 
+      {!running && (
+        <OutputsPicker
+          eventId={event.id}
+          options={OUTPUTS.map(({ id, label, description }) => ({ id, label, description }))}
+          selected={outputsOf(event.outputs)}
+        />
+      )}
       <StudioSection event={event} pieces={pieces} running={running} />
     </>
   );

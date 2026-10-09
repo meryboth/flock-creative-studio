@@ -2,7 +2,7 @@
 
 import { after } from "next/server";
 import { redirect } from "next/navigation";
-import { parseAgenda, parseAttendees } from "@flock/studio";
+import { OUTPUT_IDS, parseAgenda, parseAttendees, type OutputId } from "@flock/studio";
 import { STYLES, type StyleId } from "@flock/templates";
 import { existsSync } from "node:fs";
 import { copyFile, mkdir } from "node:fs/promises";
@@ -35,6 +35,9 @@ export async function createEventAction(_prev: FormState, form: FormData): Promi
   const attendees = parseAttendees(attendeesText);
   if (attendeesText && !attendees.length)
     return { error: "No pudimos leer la lista de asistentes. La primera fila tiene que tener los encabezados: nombre, apellido, area, rol", field: "attendees" };
+
+  const outputs = form.getAll("outputs").map(String).filter((o): o is OutputId => (OUTPUT_IDS as string[]).includes(o));
+  if (!outputs.length) return { error: "Elegí al menos un tipo de pieza para generar.", field: "outputs" };
 
   const accent = get("accent");
   const accent2 = get("accent2");
@@ -80,6 +83,7 @@ export async function createEventAction(_prev: FormState, form: FormData): Promi
     moodboard,
     agenda,
     attendees,
+    outputs,
   });
 
   // El evento guarda su propia copia de los gráficos: si después se borra el estilo o la subida, no se pierden

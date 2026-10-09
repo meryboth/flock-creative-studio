@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { asc, desc, eq } from "drizzle-orm";
 import { db, schema } from "@flock/db";
 import { writeEventCopy } from "@flock/agents";
-import { adjustFrom, generateFamily, loadRoster, type Overrides } from "@flock/studio";
+import { adjustFrom, generateFamily, loadRoster, outputsOf, type OutputId, type Overrides, type RosterSource } from "@flock/studio";
 import { buildKit, type AgendaItem, type Attendee, type EventContent, type Language, type ReferenceStyle, type StyleId } from "@flock/templates";
 import { REPO_ROOT, STORAGE_DIR } from "./paths";
 
@@ -33,6 +33,7 @@ export type NewEventInput = {
   moodboard?: unknown;
   agenda: AgendaItem[];
   attendees: Attendee[];
+  outputs: OutputId[];
 };
 
 export async function createEvent(input: NewEventInput) {
@@ -49,6 +50,7 @@ export async function createEvent(input: NewEventInput) {
         brief: input.description || null,
         style: input.style,
         moodboard: input.moodboard ?? null,
+        outputs: input.outputs,
         status: "producing",
       })
       .returning({ id: schema.events.id });
@@ -81,7 +83,16 @@ async function loadEventData(id: string) {
   return {
     event,
     agenda: agenda.map((a): AgendaItem => ({ start: a.startsAt, end: a.endsAt ?? undefined, title: a.title, speaker: a.speaker ?? undefined, room: a.room ?? undefined })),
-    attendees: people.map((p): Attendee => ({ firstName: p.firstName, lastName: p.lastName, area: p.area ?? undefined, role: p.role ?? undefined })),
+    attendees: people.map(
+      (p): Attendee => ({
+        firstName: p.firstName,
+        lastName: p.lastName,
+        area: p.area ?? undefined,
+        role: p.role ?? undefined,
+        email: p.email ?? undefined,
+        attendance: (p.attendance as Attendee["attendance"]) ?? undefined,
+      }),
+    ),
   };
 }
 
@@ -155,6 +166,7 @@ export async function runGeneration(eventId: string, { rewriteCopy = true } = {}
       elementPaths: (style.elements ?? []).map((e) => join(STORAGE_DIR, e)).filter((p) => existsSync(p)),
       // cambios pedidos en el editor conversacional
       adjust: adjustFrom(kit, event.overrides as Overrides | null),
+      outputs: outputsOf(event.outputs),
       onProgress: async (progress, total, label) => {
         await update({ progress, total, stage: `Generando: ${label}` });
       },
@@ -188,28 +200,53 @@ export async function setEventGraphics(eventId: string, graphics: { keyVisual?: 
   await db.update(schema.events).set({ style: { ...(event.style as StyleChoice), ...graphics } }).where(eq(schema.events.id, eventId));
 }
 
-export type RosterInfo = { source: string; fetchedAt: string; url?: string; count?: number; error?: string };
+export type RosterInfo = {
+  source: string;
+  fetchedAt: string;
+  url?: string;
+  fileName?: string;
+  count?: number; // personas confirmadas
+  presencial?: number; // credenciales impresas
+  error?: string;
+};
 
 /**
- * Sincroniza las credenciales con la nómina de SharePoint: reemplaza el snapshot de asistentes del evento.
- * Devuelve la cantidad de personas; la regeneración de piezas la dispara quien llama.
+ * Carga la nómina del evento desde un link de SharePoint / OneDrive o un Excel / CSV subido:
+ * reemplaza el snapshot de asistentes. La regeneración de piezas la dispara quien llama.
  */
-export async function syncRoster(eventId: string, url: string) {
+export async function syncRoster(eventId: string, input: { url: string } | { file: Buffer; fileName: string }) {
   const [event] = await db.select({ roster: schema.events.roster }).from(schema.events).where(eq(schema.events.id, eventId));
   if (!event) throw new Error("Evento inexistente");
+  const source: RosterSource =
+    "url" in input
+      ? { kind: "sharepoint-excel", url: input.url }
+      : /\.csv$/i.test(input.fileName)
+        ? { kind: "csv", text: input.file.toString("utf8") }
+        : { kind: "xlsx", data: input.file, fileName: input.fileName };
   try {
-    const roster = await loadRoster({ kind: "sharepoint-excel", url }, REPO_ROOT);
+    const roster = await loadRoster(source, REPO_ROOT);
+    const presencial = roster.attendees.filter((a) => a.attendance !== "remoto").length;
     await db.transaction(async (tx) => {
       await tx.delete(schema.attendees).where(eq(schema.attendees.eventId, eventId));
       await tx.insert(schema.attendees).values(roster.attendees.map((a) => ({ eventId, ...a })));
-      const info: RosterInfo = { source: roster.source, fetchedAt: roster.fetchedAt, url, count: roster.attendees.length };
+      const info: RosterInfo = {
+        source: roster.source,
+        fetchedAt: roster.fetchedAt,
+        ...("url" in input ? { url: input.url } : { fileName: input.fileName }),
+        count: roster.attendees.length,
+        presencial,
+      };
       await tx.update(schema.events).set({ roster: info, status: "producing" }).where(eq(schema.events.id, eventId));
     });
-    return roster.attendees.length;
+    return { count: roster.attendees.length, presencial };
   } catch (err) {
     // Se recuerda el link aunque falle, para reintentar sin volver a pegarlo
     const error = err instanceof Error ? err.message : String(err);
-    await db.update(schema.events).set({ roster: { ...(event.roster as RosterInfo | null), url, error } }).where(eq(schema.events.id, eventId));
+    const prev = event.roster as RosterInfo | null;
+    await db
+      .update(schema.events)
+      .set({ roster: { ...prev, ...("url" in input ? { url: input.url } : {}), error } })
+      .where(eq(schema.events.id, eventId));
     throw new Error(error);
   }
 }
@@ -218,4 +255,10 @@ export async function syncRoster(eventId: string, url: string) {
 export async function lastRosterUrl() {
   const rows = await db.select({ roster: schema.events.roster }).from(schema.events).orderBy(desc(schema.events.createdAt)).limit(50);
   return rows.map((r) => (r.roster as RosterInfo | null)?.url).find(Boolean) ?? null;
+}
+
+/** Cambia los grupos de piezas del evento (sumar certificados, sacar la landing…). La regeneración la dispara quien llama. */
+export async function setOutputs(eventId: string, outputs: OutputId[]) {
+  if (!outputs.length) throw new Error("Elegí al menos un tipo de pieza");
+  await db.update(schema.events).set({ outputs, status: "producing" }).where(eq(schema.events.id, eventId));
 }

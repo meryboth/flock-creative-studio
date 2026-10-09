@@ -57,6 +57,20 @@
       "when": 1791571413215,
       "tag": "0007_smooth_shocker",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791571730223,
+      "tag": "0008_bright_virginia_dare",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791571951937,
+      "tag": "0009_left_stepford_cuckoos",
+      "breakpoints": true
     }
   ]
 }

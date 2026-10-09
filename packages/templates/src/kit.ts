@@ -116,6 +116,9 @@ export type Attendee = {
   lastName: string;
   area?: string;
   role?: string;
+  email?: string;
+  // Cómo confirmó: las credenciales impresas son solo para quienes van presencial
+  attendance?: "presencial" | "remoto";
 };
 
 // Assets resueltos (data URIs para render final, URLs para previews en la app)

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useDeferredValue, useMemo, useRef, useState } from "react";
+import { OUTPUTS } from "@flock/studio/outputs";
 import { PreviewFrame } from "@/components/preview-frame";
 import { AnalysisProgress } from "@/components/progress-views";
 import { ReferencePanel, requestGraphics, type KeyVisualState, type ReferenceReading } from "@/components/reference-panel";
@@ -304,6 +305,26 @@ export function NewEventForm({ styles, library, initialLibraryId }: { styles: St
           <Field label="Bloques del día" hint="Opcional. Un bloque por línea: horario y título. Con | podés agregar la sala." error={fieldError("agenda")}>
             <textarea name="agenda" rows={5} placeholder={AGENDA_PLACEHOLDER} className={`${input} font-mono text-sm`} />
           </Field>
+          </div>
+        </fieldset>
+
+        {/* ─── Piezas ───────────────────────────────────────────── */}
+        <fieldset className="min-w-0">
+          <legend className="folder-tab label-mono bg-yellow text-ink">4 · piezas</legend>
+          <div className="space-y-3 border-[1.5px] border-ink bg-surface/85 p-5 sm:p-7">
+            <p className="text-sm text-muted">Elegí qué generar. Después podés sumar o sacar piezas desde el evento.</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {OUTPUTS.map((o) => (
+                <label key={o.id} className="flex cursor-pointer gap-3 border-[1.5px] border-ink/25 p-3 has-[:checked]:border-ink has-[:checked]:bg-mint/40">
+                  <input type="checkbox" name="outputs" value={o.id} defaultChecked={o.default} className="mt-1 accent-[var(--ink)]" />
+                  <span>
+                    <span className="block font-semibold">{o.label}</span>
+                    <span className="block text-xs text-muted">{o.description}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {fieldError("outputs") && <p className="text-sm text-orange">{fieldError("outputs")}</p>}
           </div>
         </fieldset>
 

@@ -4,6 +4,7 @@ import { mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { promisify } from "node:util";
 import { closeRenderer, renderFullPage, renderPdf, renderPng } from "@flock/renderer";
+import { OUTPUT_IDS, type OutputId } from "./outputs";
 import {
   agendaSlide,
   agendaSummary,
@@ -36,6 +37,7 @@ export type GenerateInput = {
   outDir: string; // carpeta absoluta de salida (se reemplazan sus carpetas de piezas)
   keyVisualPath?: string;
   elementPaths?: string[]; // elementos decorativos generados para el estilo
+  outputs?: OutputId[]; // grupos a generar (por defecto, todos)
   // Ajustes por pieza (editor conversacional). `file` es la ruta relativa de la pieza, ej. "linkedin/anuncio-square.png"
   adjust?: (piece: { file: string; type: PieceType }) => PieceAdjust | undefined;
   onProgress?: (done: number, total: number, label: string) => void | Promise<void>;
@@ -48,7 +50,14 @@ export type PieceAdjust = { kit?: EventKit; options?: PieceOptions };
 
 /** Genera la familia completa de piezas de un evento. */
 export async function generateFamily(input: GenerateInput): Promise<GenerateResult> {
-  const { kit, content, agenda, attendees, repoRoot } = input;
+  const { kit, content, repoRoot } = input;
+  const want = new Set(input.outputs ?? OUTPUT_IDS);
+  // Lo que no se pide no se genera (ni cuenta para el progreso)
+  const agenda = want.has("cronograma") ? input.agenda : [];
+  const linkedin = want.has("linkedin") ? content.linkedin : [];
+  const slack = want.has("slack") ? (content.slack ?? []) : [];
+  const badgePeople = want.has("credenciales") ? input.attendees.filter((a) => a.attendance !== "remoto") : [];
+  const certPeople = want.has("certificados") ? input.attendees : [];
   // Se genera en una carpeta aparte y se reemplaza al final: las piezas anteriores siguen visibles mientras tanto
   const outDir = `${input.outDir}.next`;
   const t0 = Date.now();
@@ -78,7 +87,13 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
   const sample = (template: string, html: string) => (qaSamples.has(template) ? html : (qaSamples.set(template, html), html));
 
   const total =
-    content.linkedin.length * 3 + (content.slack?.length ?? 0) * 2 + (agenda.length ? agenda.length + 1 : 0) + attendees.length * 2 + Math.ceil(attendees.length / 9) + 1;
+    linkedin.length * 3 +
+    slack.length * 2 +
+    (agenda.length ? agenda.length + 1 : 0) +
+    badgePeople.length +
+    Math.ceil(badgePeople.length / 9) +
+    certPeople.length +
+    (want.has("landing") ? 1 : 0);
   let done = 0;
   const save = async (piece: Omit<GeneratedPiece, "file"> & { path: string }, data: Buffer | string) => {
     const file = join(outDir, piece.path);
@@ -90,7 +105,7 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
 
   try {
     // LinkedIn: cada post en cuadrado y apaisado + el texto
-    for (const post of content.linkedin) {
+    for (const post of linkedin) {
       for (const format of ["square", "landscape"] as LinkedInFormat[]) {
         const path = `linkedin/${post.id}-${format}.png`;
         const html = sample(`linkedin-${format}`, linkedinPost.render(await ctxFor(path, "linkedin"), post, format));
@@ -103,7 +118,7 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
     }
 
     // Slack: imagen apaisada (se lee bien en el canal) + el texto del mensaje
-    for (const msg of content.slack ?? []) {
+    for (const msg of slack) {
       const path = `slack/${msg.id}.png`;
       const html = sample("slack", linkedinPost.render(await ctxFor(path, "slack"), { id: `slack-${msg.id}`, headline: msg.headline, body: msg.body, post: msg.text }, "landscape"));
       await save({ type: "slack", template: "slack", label: `Slack: ${msg.headline}`, path }, await renderPng(html, linkedinPost.sizes.landscape));
@@ -128,7 +143,8 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
 
     // Credenciales (PNG a 300 dpi + PDF A4 3×3) y certificados
     const badgePngs: Buffer[] = [];
-    for (const person of attendees) {
+    // Credencial impresa solo para quien va presencial (o si la nómina no dice cómo asiste)
+    for (const person of badgePeople) {
       const path = `credenciales/${slugify(`${person.firstName}-${person.lastName}`)}.png`;
       const png = await renderPng(sample("badge", badge.render(await ctxFor(path, "badge"), person)), badge.size);
       badgePngs.push(png);
@@ -141,7 +157,7 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
         await renderPdf(badgeSheet(ctx, uris)),
       );
     }
-    for (const person of attendees) {
+    for (const person of certPeople) {
       const path = `certificados/${slugify(`${person.firstName}-${person.lastName}`)}.png`;
       await save(
         { type: "certificate", template: "certificate", label: `${person.firstName} ${person.lastName}`, path },
@@ -150,17 +166,21 @@ export async function generateFamily(input: GenerateInput): Promise<GenerateResu
     }
 
     // Landing autocontenida + capturas de control
-    const landingHtml = sample("landing", landing.render(await ctxFor("landing/index.html", "landing"), content.landing, agenda));
-    await save({ type: "landing", template: "landing", label: "Landing", path: "landing/index.html" }, landingHtml);
-    await writeFile(join(outDir, "landing/preview-desktop.png"), await renderFullPage(landingHtml, 1440));
-    await writeFile(join(outDir, "landing/preview-mobile.png"), await renderFullPage(landingHtml, 390, 2));
+    if (want.has("landing")) {
+      const landingHtml = sample("landing", landing.render(await ctxFor("landing/index.html", "landing"), content.landing, input.agenda));
+      await save({ type: "landing", template: "landing", label: "Landing", path: "landing/index.html" }, landingHtml);
+      await writeFile(join(outDir, "landing/preview-desktop.png"), await renderFullPage(landingHtml, 1440));
+      await writeFile(join(outDir, "landing/preview-mobile.png"), await renderFullPage(landingHtml, 390, 2));
+    }
   } finally {
     await closeRenderer();
   }
 
   const qaReport = await designQa(repoRoot, join(outDir, "qa"), qaSamples);
-  // Reemplaza solo las carpetas de piezas: inputs/ (key visual, elementos) queda intacta
+  // Reemplaza solo las carpetas de piezas: inputs/ (key visual, elementos) queda intacta.
+  // Los grupos que se sacaron del evento se borran.
   await mkdir(input.outDir, { recursive: true });
+  for (const group of OUTPUT_IDS) await rm(join(input.outDir, group), { recursive: true, force: true });
   for (const folder of await readdir(outDir)) {
     await rm(join(input.outDir, folder), { recursive: true, force: true });
     await rename(join(outDir, folder), join(input.outDir, folder));

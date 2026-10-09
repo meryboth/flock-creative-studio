@@ -31,21 +31,60 @@ const normalizeKey = (h: string) =>
 
 const pick = (r: Record<string, string>, ...keys: string[]) => keys.map((k) => r[k]).find(Boolean) ?? "";
 
-/** Asistentes desde CSV. Acepta encabezados en español o inglés, o una columna "nombre completo". */
+/**
+ * Asistentes desde CSV (o desde un Excel convertido a CSV). Acepta encabezados en español o inglés,
+ * una columna de nombre completo, y exportaciones de Microsoft Forms: "Nombre" con nombre y apellido,
+ * "Correo electrónico" y una pregunta de confirmación ("¿te sumás a participar?": presencial, remoto o no).
+ */
 export function parseAttendees(text: string): Attendee[] {
-  return parseCsv(text)
-    .map((r) => {
+  const rows = parseCsv(text);
+  const keys = Object.keys(rows[0] ?? {});
+  // Columna de confirmación: la primera cuyo encabezado pregunta por la participación
+  const attendanceKey = keys.find((k) => /particip|asist|sumas|confirm|modalidad|vas_a|vienes|venis/.test(k));
+  const seen = new Set<string>();
+  return rows
+    .map((r): Attendee | null => {
       let firstName = pick(r, "nombre", "first_name", "firstname", "name");
       let lastName = pick(r, "apellido", "last_name", "lastname", "surname");
-      const full = pick(r, "nombre_completo", "full_name", "fullname");
-      if (!firstName && full) {
-        const [first, ...rest] = full.split(" ");
+      const full = pick(r, "nombre_completo", "full_name", "fullname", "nombre_y_apellido");
+      // Sin columna de apellido: "Lucía Herrera" → Lucía / Herrera
+      const whole = !firstName && full ? full : !lastName && firstName.includes(" ") ? firstName : "";
+      if (whole) {
+        const [first, ...rest] = whole.trim().split(/\s+/);
         firstName = first;
         lastName = rest.join(" ");
       }
-      return { firstName, lastName, area: pick(r, "area", "team", "equipo") || undefined, role: pick(r, "rol", "role", "puesto", "cargo") || undefined };
+      const attendance = attendanceKey ? attendanceOf(r[attendanceKey]) : undefined;
+      if (attendance === "no") return null;
+      const email = pick(r, "correo_electronico", "correo", "email", "mail", "e_mail").toLowerCase() || undefined;
+      return {
+        firstName,
+        lastName,
+        area: pick(r, "area", "team", "equipo") || undefined,
+        role: pick(r, "rol", "role", "puesto", "cargo") || undefined,
+        email,
+        attendance: attendance ?? undefined,
+      };
     })
-    .filter((a) => a.firstName);
+    .filter((a): a is Attendee => Boolean(a?.firstName))
+    .filter((a) => {
+      // la misma persona puede haber respondido dos veces el formulario
+      const key = a.email ?? `${a.firstName} ${a.lastName}`.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+/** "Sí, de forma presencial" → presencial; "Sí, remoto" → remoto; "No" → no; vacío → sin dato. */
+function attendanceOf(value = ""): "presencial" | "remoto" | "no" | null {
+  const v = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  if (!v) return null;
+  if (/remot|virtual|online|a distancia/.test(v)) return "remoto";
+  if (/presencial|en persona|oficina/.test(v)) return "presencial";
+  if (/^no\b/.test(v)) return "no";
+  if (/^(si|yes)\b/.test(v)) return "presencial";
+  return null;
 }
 
 /**
