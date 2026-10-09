@@ -1,0 +1,28 @@
+{
+  "id": "imagenes",
+  "version": 1,
+  "description": "Frases por técnica para los prompts de imágenes y negativos para ComfyUI.",
+  "data": {
+    "negative": "text, letters, words, numbers, typography, watermark, logo, signature, frame, border, ui, full frame texture, busy background, pattern, cropped, pedestal, stand, floor, table, horizon, low quality, blurry, jpeg artifacts",
+    "negativeByMedium": {
+      "pixel-art": "perspective, 3d, photo, realistic, interior, room, grid, gradient, smooth shading, blur",
+      "flat-vector": "3d, photo, realistic, gradient mesh, texture",
+      "hand-drawn": "3d, photo, realistic",
+      "3d-render": "flat, sketch, photo of people",
+      "line-art-halftone": "3d, photo, realistic, gradient, soft shading, color fill everywhere",
+      "risograph": "3d, photo, realistic, glossy, smooth gradient",
+      "collage": "3d render, glossy, cartoon"
+    },
+    "mediumPhrase": {
+      "pixel-art": "high quality pixel art sprite, clean 1px dark outline, 3-tone shading, limited palette, crisp pixels, game asset",
+      "flat-vector": "flat vector illustration, clean shapes, bold colors",
+      "hand-drawn": "hand-drawn illustration with expressive ink lines",
+      "3d-render": "glossy 3D render, studio lighting",
+      "photo": "photographic object",
+      "abstract-gradient": "abstract shape with smooth gradients",
+      "line-art-halftone": "quirky cartoon line art with thick black outlines, white fill and halftone dot shading, retro comic sticker",
+      "risograph": "risograph print illustration, two or three flat spot colors, visible grain and slight misregistration",
+      "collage": "paper cut-out collage, torn edges, layered flat colors, analog texture"
+    }
+  }
+}

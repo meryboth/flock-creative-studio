@@ -3,6 +3,7 @@ import { BODY_FONTS, contrast, DISPLAY_FONTS, fontMeta, LAYOUTS, type ReferenceS
 import sharp from "sharp";
 import { z } from "zod";
 import { invokeStructured } from "./llm";
+import { loadPrompt } from "./prompts";
 
 const HEX = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const score = () => z.number();
@@ -43,26 +44,35 @@ export async function critiquePiece(opts: { references: string[]; piece: Buffer;
   const refs = await Promise.all(opts.references.slice(0, 2).map((f) => toJpeg(f)));
   const images = [...refs, await toJpeg(opts.piece), ...(opts.antiReference ? [await toJpeg(opts.antiReference)] : [])];
   const s = opts.style;
-  const text = `Sos director de arte y revisás la fidelidad de una pieza generada por código respecto de una referencia de estilo.
-
-Imágenes, en este orden:
-${refs.map((_, i) => `${i + 1}. REFERENCIA${refs.length > 1 ? ` ${i + 1}` : ""}: el estilo a lograr.`).join("\n")}
-${refs.length + 1}. PIEZA generada (un posteo de LinkedIn de un evento de Flock; el logo de Flock es obligatorio y no se evalúa).
-${opts.antiReference ? `${refs.length + 2}. ANTI-REFERENCIA: el estilo del AI Day 2026, del que el sistema tiende a no salir. La pieza NO debería parecerse a esta.` : ""}
-
-Cómo se armó la pieza (lo que podés cambiar):
-- composición: ${s.layout ?? "clasico"} (opciones: tipografico = tipografía gigante de borde a borde con el visual superpuesto; bloques = planos de color grandes con el texto adentro; clasico = logo arriba, título abajo, visual en la esquina)
-- títulos: ${s.typography.display} (${fontMeta(s.typography.display)?.character ?? ""}), caja ${s.typography.case}, peso ${s.typography.weight}, ancho ${s.typography.width}
-- texto: ${s.typography.body}
-- visual: ${s.generator}${s.motifs?.length ? ` (${s.motifs.join(", ")})` : ""}, textura ${s.texture ?? "none"}, esquinas ${s.corners}
-- píldoras de color: ${s.devices?.pills ? "sí" : "no"}; semitono: ${s.devices?.halftone ? "sí" : "no"}
-- colores: fondo ${s.colors.ground}, texto ${s.colors.ink}, acento ${s.colors.accent}, acento 2 ${s.colors.accent2}
-
-Fuentes disponibles para títulos (elegí por carácter): ${DISPLAY_FONTS.map((f) => `${f} (${fontMeta(f)!.character})`).join("; ")}.
-
-Puntuá de 0 a 10 cada aspecto y proponé SOLO los cambios que acerquen la pieza a la referencia. No copies personajes, logos ni textos de la referencia: se trata del estilo.`;
+  const prompt = loadPrompt("critic");
+  const text = prompt.render({
+    images: [
+      ...refs.map((_, i) => `${i + 1}. REFERENCIA${refs.length > 1 ? ` ${i + 1}` : ""}: el estilo a lograr.`),
+      `${refs.length + 1}. PIEZA generada (un posteo de LinkedIn de un evento de Flock; el logo de Flock es obligatorio y no se evalúa).`,
+      ...(opts.antiReference
+        ? [`${refs.length + 2}. ANTI-REFERENCIA: el estilo del AI Day 2026, del que el sistema tiende a no salir. La pieza NO debería parecerse a esta.`]
+        : []),
+    ].join("\n"),
+    layout: s.layout ?? "clasico",
+    display: s.typography.display,
+    displayCharacter: fontMeta(s.typography.display)?.character ?? "",
+    case: s.typography.case,
+    weight: s.typography.weight,
+    width: s.typography.width,
+    body: s.typography.body,
+    visual: `${s.generator}${s.motifs?.length ? ` (${s.motifs.join(", ")})` : ""}`,
+    texture: s.texture ?? "none",
+    corners: s.corners,
+    pills: s.devices?.pills ? "sí" : "no",
+    halftone: s.devices?.halftone ? "sí" : "no",
+    ground: s.colors.ground,
+    ink: s.colors.ink,
+    accent: s.colors.accent,
+    accent2: s.colors.accent2,
+    fonts: DISPLAY_FONTS.map((f) => `${f} (${fontMeta(f)!.character})`).join("; "),
+  });
   const message = new HumanMessage({ content: [{ type: "text", text }, ...images.map((url) => ({ type: "image_url" as const, image_url: url }))] });
-  const { out, model } = await invokeStructured("vision", CritiqueSchema, [message], { name: "critique", temperature: 0.1, timeoutMs: Number(process.env.CRITIC_TIMEOUT_MS ?? 90_000) });
+  const { out, model } = await invokeStructured("vision", CritiqueSchema, [message], { name: "critique", temperature: 0.1, timeoutMs: Number(process.env.CRITIC_TIMEOUT_MS ?? 90_000), prompt });
   const clamp = (n: number) => Math.max(0, Math.min(10, n));
   const v = { typography: clamp(out.scores.typography), color: clamp(out.scores.color), composition: clamp(out.scores.composition), illustration: clamp(out.scores.illustration) };
   const overall = Math.round(((v.typography + v.color + v.composition * 1.5 + v.illustration) / 4.5) * 10) / 10;

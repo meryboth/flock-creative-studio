@@ -23,3 +23,4 @@ Bitácora de lo que se fue implementando en **Flock Creative Studio** (antes "Fl
 | 13 | [Claude como proveedor y calendario](13-claude-y-calendario.md) | 2026-10-09 |
 | 14 | [Diversidad: salir del esqueleto del AI Day](14-diversidad.md) | 2026-10-09 |
 | 15 | [Slack preparado, nómina desde Forms y piezas opcionales](15-slack-nomina-piezas-opcionales.md) | 2026-10-09 |
+| 16 | [Calidad, trazabilidad, costo y evals](16-calidad-metricas-evals.md) | 2026-10-09 |

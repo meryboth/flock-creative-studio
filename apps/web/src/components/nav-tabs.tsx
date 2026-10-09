@@ -9,6 +9,7 @@ const NAV = [
   { href: "/calendario", label: "Calendario", match: (p: string) => p.startsWith("/calendario") },
   { href: "/estilos", label: "Estilos", match: (p: string) => p.startsWith("/estilos") },
   { href: "/marca", label: "Marca", match: (p: string) => p.startsWith("/marca") },
+  { href: "/metricas", label: "Métricas", match: (p: string) => p.startsWith("/metricas") },
 ];
 
 /** Pestañas con la sección actual resaltada (depende de la URL: va dentro de un Suspense). */

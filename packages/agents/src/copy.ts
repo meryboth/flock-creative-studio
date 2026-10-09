@@ -1,6 +1,7 @@
 import type { AgendaItem, EventContent, EventInfo, Moment } from "@flock/templates";
 import { z } from "zod";
 import { invokeStructured, providers } from "./llm";
+import { loadPrompt } from "./prompts";
 
 const ContentSchema = z.object({
   linkedin: z
@@ -42,40 +43,29 @@ export type CopyResult = { content: EventContent; source: "llm" | "fallback"; mo
 export async function writeEventCopy(input: CopyInput): Promise<CopyResult> {
   if (!providers().length) return { content: fallbackCopy(input), source: "fallback", error: "No hay proveedor de LLM configurado" };
   try {
-    const { out, model } = await invokeStructured("text", ContentSchema, prompt(input), { name: "event_copy", temperature: 0.7, timeoutMs: 90_000 });
+    const { out, model } = await invokeStructured("text", ContentSchema, prompt(input), { name: "event_copy", temperature: 0.7, timeoutMs: 90_000, prompt: PROMPT() });
     return { content: toContent(out), source: "llm", model };
   } catch (err) {
     return { content: fallbackCopy(input), source: "fallback", error: err instanceof Error ? err.message : String(err) };
   }
 }
 
+const PROMPT = () => loadPrompt("copy");
+
 function prompt({ event, agenda }: CopyInput) {
-  const lang = event.language === "es" ? "español rioplatense (voseo)" : "inglés";
-  const agendaText = agenda.length
-    ? agenda.map((a) => `- ${a.start}${a.end ? `–${a.end}` : ""} ${a.title}${a.speaker ? ` (${a.speaker})` : ""}`).join("\n")
-    : "(sin agenda cargada)";
-  return `Sos redactor de comunicación interna de Flock IT, una empresa de tecnología. Escribí los textos de un evento interno para flockers (las personas de Flock).
-
-Idioma: ${lang}. Tono: cercano, entusiasta y profesional; nada de clichés corporativos ni exageraciones.
-
-Datos del evento (no inventes nada que no esté acá: ni speakers, ni cifras, ni premios, ni lugares):
-- Nombre: ${event.name}
-- Fecha: ${event.date}
-- Lugar: ${event.location ?? "a confirmar"}
-- Hashtag: ${event.hashtag}
-- Frase: ${event.tagline ?? "-"}
-- Descripción: ${event.description ?? "-"}
-- Agenda:
-${agendaText}
-
-Escribí:
-1. Tres posteos de LinkedIn (públicos, cuentan el evento hacia afuera), uno por momento, en este orden e id:
-   - "anuncio": ANTES. Se viene el evento: qué es, cuándo y por qué importa.
-   - "en-vivo": DURANTE. Se publica el día del evento, en presente: qué se está viviendo${agenda.length ? " (podés nombrar bloques de la agenda)" : ", sin inventar horarios"}.
-   - "gracias": DESPUÉS. Balance y agradecimiento, en pasado, sin inventar resultados ni cifras.
-   Cada uno con titular para la imagen, bajada y el texto del post. Todos terminan con ${event.hashtag} y como mucho otros 2 hashtags.
-2. Tres mensajes para Slack interno (para flockers, más cortos y directos que LinkedIn), en este orden e id: "anuncio" (se viene: agendalo), "hoy" (es hoy: dónde y a qué hora arranca) y "gracias" (gracias por sumarte). Cada uno con titular, bajada y el texto del mensaje.
-3. Los textos de la landing: introducción, tres destacados (qué se va a vivir) y el texto del botón.`;
+  return PROMPT().render({
+    lang: event.language === "es" ? "español rioplatense (voseo)" : "inglés",
+    name: event.name,
+    date: event.date,
+    location: event.location ?? "a confirmar",
+    hashtag: event.hashtag,
+    tagline: event.tagline ?? "-",
+    description: event.description ?? "-",
+    agenda: agenda.length
+      ? agenda.map((a) => `- ${a.start}${a.end ? `–${a.end}` : ""} ${a.title}${a.speaker ? ` (${a.speaker})` : ""}`).join("\n")
+      : "(sin agenda cargada)",
+    liveNote: agenda.length ? " (podés nombrar bloques de la agenda)" : ", sin inventar horarios",
+  });
 }
 
 const LINKEDIN_MOMENT: Record<string, Moment> = { anuncio: "antes", "en-vivo": "durante", gracias: "despues" };

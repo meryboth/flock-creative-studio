@@ -104,6 +104,12 @@ async function EventContent({ params }: { params: PageProps<"/eventos/[slug]">["
         <p className="mb-10 font-hand text-xl leading-snug text-muted">
           {run.stage}
           {event.contentSource && event.contentSource !== "fallback" && ` · textos: ${event.contentSource.split(":").pop()}`}
+          {run.manualMinutes != null && run.machineSeconds != null && (
+            <span className="mt-1 block">
+              A mano serían ~{Math.round(run.manualMinutes / 60)} h de diseño (línea base); acá tardó {Math.round(run.machineSeconds)} s
+              {run.costUsd > 0 && ` · costo de IA ~US$ ${run.costUsd.toFixed(3)}`}.
+            </span>
+          )}
           {event.contentSource === "fallback" && " · La IA no respondió: se usaron textos base."}
           {event.contentSource === "fallback" && run.error && <span className="mt-1 block font-mono text-xs not-italic">{run.error}</span>}
           {(event.roster as { source?: string } | null)?.source === "mock" && (

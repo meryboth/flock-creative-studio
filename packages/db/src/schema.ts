@@ -280,7 +280,10 @@ export const runs = pgTable("runs", {
   stage: text("stage"), // texto de progreso para la UI
   progress: integer("progress").notNull().default(0),
   total: integer("total").notNull().default(0),
-  costUsd: real("cost_usd").notNull().default(0),
+  costUsd: real("cost_usd").notNull().default(0), // suma de llm_calls de la corrida
+  // Tiempo ahorrado: estimación del trabajo manual equivalente (línea base) contra el tiempo de máquina
+  manualMinutes: real("manual_minutes"),
+  machineSeconds: real("machine_seconds"),
   error: text("error"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
@@ -355,10 +358,13 @@ export const llmCalls = pgTable(
     inputTokens: integer("input_tokens"),
     outputTokens: integer("output_tokens"),
     error: text("error"),
+    promptId: text("prompt_id"), // prompt versionado (packages/agents/prompts)
+    promptVersion: integer("prompt_version"),
+    costUsd: real("cost_usd"), // estimado con la tabla de precios (packages/agents/src/pricing.ts)
     eventId: uuid("event_id").references(() => events.id, { onDelete: "set null" }),
     runId: uuid("run_id").references(() => runs.id, { onDelete: "set null" }),
   },
-  (t) => [index().on(t.task, t.at), index().on(t.model)],
+  (t) => [index().on(t.task, t.at), index().on(t.model), index().on(t.runId), index().on(t.eventId)],
 );
 
 // ─── Evals: calidad medida de los agentes y del diseño ──────────────────────

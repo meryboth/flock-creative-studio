@@ -1,0 +1,62 @@
+# Integración continua: tipos, lint, tests, migraciones y evals sobre los fixtures del repo.
+# Las evals con modelos (textos, chat, lectura de referencias, verificador) corren solo si el repo
+# tiene el secreto ANTHROPIC_API_KEY (o GOOGLE_API_KEY); la de diseño y diversidad corre siempre.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: flock
+          POSTGRES_PASSWORD: flock
+          POSTGRES_DB: flock_event_studio
+        ports: ["5433:5432"]
+        options: --health-cmd "pg_isready -U flock" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://flock:flock@localhost:5433/flock_event_studio
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Paquete de plantillas
+        run: pnpm --filter @flock/templates build
+      - name: Tipos
+        run: |
+          for p in packages/templates packages/agents packages/studio packages/renderer packages/db apps/web tools; do
+            echo "▸ $p"; (cd $p && npx tsc --noEmit -p .)
+          done
+      - name: Lint de la app
+        run: pnpm --filter @flock/web lint
+      - name: Navegador para render (Playwright)
+        run: pnpm --filter @flock/renderer exec playwright install --with-deps chromium
+      - name: Migraciones
+        run: pnpm db:migrate
+      - name: Tests (Vitest)
+        run: pnpm test
+      - name: Evals de diseño y diversidad (sin modelos)
+        run: pnpm evals --suite design
+      - name: Evals con modelos
+        if: env.ANTHROPIC_API_KEY != '' || env.GOOGLE_API_KEY != ''
+        run: pnpm evals --suite copy,editor,reference,verifier
+      - name: Reporte de evals
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evals
+          path: docs/evals/resultados.md
+          if-no-files-found: ignore

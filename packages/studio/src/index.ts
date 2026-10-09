@@ -4,3 +4,4 @@ export { loadRoster, readWorkbook, type RosterSource, type RosterSnapshot } from
 export { addPatch, adjustFrom, applyPatch, groupOf, mergePatch, GROUP_LABEL, type ColorRole, type Overrides, type Patch, type PieceGroup } from "./overrides";
 export { refineReferenceStyle, type RefineStep } from "./refine";
 export { OUTPUTS, OUTPUT_IDS, DEFAULT_OUTPUTS, outputsOf, type OutputId } from "./outputs";
+export { baseline, manualMinutes, DEFAULT_BASELINE, type Baseline } from "./baseline";

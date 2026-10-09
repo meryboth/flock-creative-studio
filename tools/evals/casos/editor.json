@@ -1,0 +1,175 @@
+[
+  {
+    "id": "titulo-grande",
+    "message": "hacé el título más grande",
+    "expect": [
+      {
+        "op": "setTitleScale",
+        "gt": 1
+      }
+    ]
+  },
+  {
+    "id": "titulo-mucho-mas-chico",
+    "message": "el título mucho más chico",
+    "expect": [
+      {
+        "op": "setTitleScale",
+        "lt": 0.85
+      }
+    ]
+  },
+  {
+    "id": "fondo-negro",
+    "message": "poné el fondo negro",
+    "expect": [
+      {
+        "op": "setColor",
+        "role": "ground",
+        "dark": true
+      }
+    ],
+    "allow": [
+      {
+        "op": "setColor",
+        "role": "ink"
+      },
+      {
+        "op": "setColor",
+        "role": "muted"
+      }
+    ],
+    "nota": "Ajustar el texto para que siga leyéndose sobre el fondo nuevo está bien"
+  },
+  {
+    "id": "sacar-hashtag",
+    "message": "sacá el hashtag",
+    "expect": [
+      {
+        "op": "hide",
+        "element": "hashtag"
+      }
+    ]
+  },
+  {
+    "id": "mostrar-fecha",
+    "message": "volvé a mostrar la fecha",
+    "expect": [
+      {
+        "op": "show",
+        "element": "date"
+      }
+    ]
+  },
+  {
+    "id": "mayusculas",
+    "message": "los títulos en mayúsculas",
+    "expect": [
+      {
+        "op": "setCase",
+        "value": "upper"
+      }
+    ]
+  },
+  {
+    "id": "bloques",
+    "message": "probá con bloques de color",
+    "expect": [
+      {
+        "op": "setLayout",
+        "value": "bloques"
+      }
+    ]
+  },
+  {
+    "id": "nombre-gigante",
+    "message": "que el nombre del evento sea gigante, de borde a borde",
+    "expect": [
+      {
+        "op": "setLayout",
+        "value": "tipografico"
+      }
+    ]
+  },
+  {
+    "id": "serif-elegante",
+    "message": "cambiá la letra de los títulos por una serif elegante",
+    "expect": [
+      {
+        "op": "setFont",
+        "role": "display",
+        "category": [
+          "serif-display",
+          "serif-editorial"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "semitono",
+    "message": "sumale una trama de puntos tipo semitono",
+    "expect": [
+      {
+        "op": "setDevice",
+        "value": "halftone",
+        "number": 1
+      }
+    ]
+  },
+  {
+    "id": "visual-chico",
+    "message": "la ilustración más chiquita",
+    "expect": [
+      {
+        "op": "setVisualScale",
+        "lt": 1
+      }
+    ]
+  },
+  {
+    "id": "dos-cambios",
+    "message": "título más grande y sin la frase",
+    "expect": [
+      {
+        "op": "setTitleScale",
+        "gt": 1
+      },
+      {
+        "op": "hide",
+        "element": "tagline"
+      }
+    ]
+  },
+  {
+    "id": "cambiar-titular",
+    "message": "cambiá el titular por 'Llega la Hack Night'",
+    "piece": {
+      "file": "linkedin/anuncio-square.png",
+      "label": "Se viene la Hack Night (cuadrado)",
+      "group": "posteos de LinkedIn",
+      "headline": "Se viene la Hack Night",
+      "body": "Una noche para construir con IA."
+    },
+    "expect": [
+      {
+        "op": "setCopy",
+        "field": "headline",
+        "text": "Llega la Hack Night"
+      }
+    ],
+    "scope": "piece"
+  },
+  {
+    "id": "logo-protegido",
+    "message": "sacá el logo de Flock",
+    "expect": [],
+    "forbid": [
+      "hide"
+    ]
+  },
+  {
+    "id": "fuera-de-alcance",
+    "message": "agregá un video animado con música",
+    "expect": []
+  }
+]

@@ -2,6 +2,7 @@ import { HumanMessage } from "@langchain/core/messages";
 import sharp from "sharp";
 import { z } from "zod";
 import { invokeStructured } from "./llm";
+import { loadPrompt } from "./prompts";
 
 /** Un dato que la pieza tiene que mostrar completo y sin errores. */
 export type ExpectedField = { field: string; value: string };
@@ -32,34 +33,31 @@ const norm = (s: string) =>
     .trim();
 
 /**
+ * Cruza lo que leyó el modelo con lo esperado, sin confiar ciegamente en su "status":
+ * si leyó el valor completo es ok; si leyó solo el principio ("19:0" de "19:00"), está cortado.
+ */
+export function reconcileFields(expected: ExpectedField[], got: { field: string; status: string; read: string }[]): FieldCheck[] {
+  return expected.map((e) => {
+    const g = got.find((f) => norm(f.field) === norm(e.field));
+    let status = (STATUSES as readonly string[]).includes(g?.status ?? "") ? (g!.status as FieldCheck["status"]) : "falta";
+    if (g && norm(g.read).includes(norm(e.value))) status = "ok";
+    else if (g?.read && norm(e.value).startsWith(norm(g.read)) && norm(g.read).length < norm(e.value).length) status = "cortado";
+    return { field: e.field, expected: e.value, status, read: g?.read ?? "" };
+  });
+}
+
+/**
  * Verificador de lectura: un modelo con visión lee la pieza renderizada y confirma que cada dato
  * (horarios, títulos, nombres, fecha) aparece completo y correcto. Detecta textos cortados por el
  * diseño que el control geométrico no ve (ej. una hora que se sale de su bloque).
  */
 export async function verifyPieceReading(png: Buffer, expected: ExpectedField[]): Promise<ReadingCheck> {
   const image = `data:image/png;base64,${(await sharp(png).resize(1400, 1400, { fit: "inside" }).png().toBuffer()).toString("base64")}`;
-  const text = `Sos el control de calidad de piezas gráficas de un evento. Mirá la imagen y, para cada dato de la lista, decí si se lee COMPLETO y CORRECTO.
-
-Datos que la pieza tiene que mostrar:
-${expected.map((e) => `- ${e.field}: "${e.value}"`).join("\n")}
-
-Para cada dato devolvé:
-- status "ok": se lee entero y es el mismo (no importan mayúsculas ni tildes).
-- status "cortado": aparece pero le falta una parte porque el diseño lo corta (ej. "19:0" en vez de "19:00", una palabra que se sale del borde o queda tapada).
-- status "falta": no aparece.
-- status "distinto": aparece otro valor.
-En "read" copiá textual lo que se ve. No inventes: si no lo ves, es "falta".`;
+  const prompt = loadPrompt("verifier");
+  const text = prompt.render({ expected: expected.map((e) => `- ${e.field}: "${e.value}"`).join("\n") });
   const message = new HumanMessage({ content: [{ type: "text", text }, { type: "image_url" as const, image_url: image }] });
-  const { out, model } = await invokeStructured("vision", ReadingSchema, [message], { name: "piece_reading", temperature: 0, timeoutMs: 60_000 });
+  const { out, model } = await invokeStructured("vision", ReadingSchema, [message], { name: "piece_reading", temperature: 0, timeoutMs: 60_000, prompt });
 
-  const fields: FieldCheck[] = expected.map((e) => {
-    const got = out.fields.find((f) => norm(f.field) === norm(e.field));
-    let status = (STATUSES as readonly string[]).includes(got?.status ?? "") ? (got!.status as FieldCheck["status"]) : "falta";
-    // Si el modelo leyó exactamente el valor esperado, vale como ok aunque haya dudado
-    if (got && norm(got.read).includes(norm(e.value))) status = "ok";
-    // Y al revés: si leyó solo el principio del valor ("19:0" de "19:00"), está cortado aunque diga ok
-    else if (got?.read && norm(e.value).startsWith(norm(got.read)) && norm(got.read).length < norm(e.value).length) status = "cortado";
-    return { field: e.field, expected: e.value, status, read: got?.read ?? "" };
-  });
+  const fields = reconcileFields(expected, out.fields);
   return { ok: fields.every((f) => f.status === "ok"), fields, model };
 }

@@ -5,13 +5,17 @@
   "type": "module",
   "dependencies": {
     "@flock/agents": "workspace:*",
+    "@flock/db": "workspace:*",
     "@flock/renderer": "workspace:*",
     "@flock/studio": "workspace:*",
     "@flock/templates": "workspace:*",
     "@imgly/background-removal-node": "^1.4.5",
+    "culori": "^4.0.2",
+    "drizzle-orm": "^0.45.4",
     "sharp": "^0.35.5"
   },
   "devDependencies": {
+    "@types/culori": "^4.0.1",
     "@types/node": "^20.19.43",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3"

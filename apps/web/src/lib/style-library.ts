@@ -1,4 +1,5 @@
 import "server-only";
+import { track } from "./telemetry";
 import { existsSync } from "node:fs";
 import { cp, mkdir, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -81,6 +82,7 @@ export async function createLibraryStyle(name: string, uploadId: string) {
       elements: elementFiles.map((f) => rel(`elements/${f}`)),
     })
     .where(eq(schema.styles.id, row.id));
+  track("style.created", { props: { styleId: row.id, layout: stored.style.layout ?? null } });
   return row.id;
 }
 
@@ -88,4 +90,5 @@ export async function deleteLibraryStyle(id: string) {
   await db.delete(schema.styles).where(eq(schema.styles.id, id));
   const dir = styleDir(id);
   if (existsSync(dir)) await rm(dir, { recursive: true, force: true });
+  track("style.deleted", { props: { styleId: id } });
 }

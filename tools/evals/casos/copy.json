@@ -1,0 +1,24 @@
+[
+  {
+    "id": "hack-night-es",
+    "event": { "name": "Hack Night 2026", "date": "2026-11-27", "dateLabel": "27.11.26", "language": "es", "location": "Oficinas Flock", "hashtag": "#FLOCKHACKNIGHT2026", "tagline": "Una noche para construir con IA", "description": "Una noche de hackathon interna para armar prototipos con IA en equipos mixtos." },
+    "agenda": [
+      { "start": "19:00", "end": "19:30", "title": "Armado de equipos" },
+      { "start": "19:30", "end": "22:30", "title": "Hacking" },
+      { "start": "22:30", "end": "23:30", "title": "Demos y premios" }
+    ]
+  },
+  {
+    "id": "outdoor-sin-agenda",
+    "event": { "name": "Flock Outdoor 2027", "date": "2027-03-20", "dateLabel": "20.03.27", "language": "es", "location": "Reserva Natural Costanera Sur", "hashtag": "#FLOCKOUTDOOR2027", "description": "Una jornada al aire libre para compartir entre equipos." },
+    "agenda": []
+  },
+  {
+    "id": "ai-day-en",
+    "event": { "name": "AI Day 2026", "date": "2026-10-09", "dateLabel": "09.10.26", "language": "en", "location": "Flock HQ", "hashtag": "#FLOCKAIDAY", "description": "A day to learn, experiment and evolve together in the adoption of AI." },
+    "agenda": [
+      { "start": "9:30", "end": "10:00", "title": "Kick-off" },
+      { "start": "10:00", "end": "12:30", "title": "Workshops" }
+    ]
+  }
+]

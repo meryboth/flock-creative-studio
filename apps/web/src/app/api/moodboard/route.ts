@@ -4,6 +4,7 @@ import { extname, join } from "node:path";
 import { analyzeMoodboard, analyzeReference } from "@flock/agents";
 import { refineReferenceStyle, type RefineStep } from "@flock/studio";
 import { REPO_ROOT, UPLOADS_DIR } from "@/lib/paths";
+import { track } from "@/lib/telemetry";
 
 // Rondas del crítico de fidelidad (0 lo apaga). Cada ronda suma ~5 s.
 const CRITIC_ROUNDS = Number(process.env.CRITIC_ROUNDS ?? 1);
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
     // Lectura del estilo con un modelo de visión: si falla, igual devolvemos los colores medidos
     let reference: Awaited<ReturnType<typeof analyzeReference>> | null = null;
     let referenceError: string | null = null;
+    const t0 = Date.now();
     try {
       reference = await analyzeReference(paths);
       // Crítico: renderiza un posteo con la lectura, lo compara con la referencia (y con el AI Day) y ajusta
@@ -51,8 +53,20 @@ export async function POST(req: Request) {
         }
       }
       await writeFile(join(dir, "reference.json"), JSON.stringify({ ...reference, critique }, null, 2));
+      track("reference.analyzed", {
+        durationMs: Date.now() - t0,
+        props: {
+          images: paths.length,
+          model: reference.model,
+          medium: reference.medium,
+          layout: reference.style.layout,
+          display: reference.style.typography.display,
+          criticScores: critique?.map((c) => c.score),
+        },
+      });
     } catch (err) {
       referenceError = err instanceof Error ? err.message : String(err);
+      track("reference.analyzed", { ok: false, durationMs: Date.now() - t0, props: { images: paths.length, error: referenceError.slice(0, 300) } });
       console.warn("[referencia]", referenceError);
     }
     return Response.json({

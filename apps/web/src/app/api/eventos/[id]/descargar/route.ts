@@ -6,6 +6,7 @@ import { db, schema } from "@flock/db";
 import { eq } from "drizzle-orm";
 import { slugify } from "@flock/studio";
 import { STORAGE_DIR } from "@/lib/paths";
+import { track } from "@/lib/telemetry";
 
 const GROUPS = ["linkedin", "slack", "cronograma", "credenciales", "certificados", "landing"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -29,6 +30,7 @@ export async function GET(req: Request, ctx: RouteContext<"/api/eventos/[id]/des
   }
   if (!Object.keys(files).length) return new Response("Todavía no hay piezas", { status: 404 });
   const data = await new Promise<Uint8Array>((resolve, reject) => zip(files, (err, out) => (err ? reject(err) : resolve(out))));
+  track("download.zip", { eventId: id, props: { group: grupo ?? "todo", files: Object.keys(files).length } });
   const filename = `${slugify(event.name)}${grupo ? `-${grupo}` : ""}.zip`;
   return new Response(new Blob([data as BlobPart]), {
     headers: { "Content-Type": "application/zip", "Content-Disposition": `attachment; filename="${filename}"` },

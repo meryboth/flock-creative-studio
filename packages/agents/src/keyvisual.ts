@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { removeBackground } from "@imgly/background-removal-node";
 import { converter } from "culori";
 import sharp from "sharp";
+import { loadFragments, loadPrompt } from "./prompts";
 
 export type KeyVisualResult =
   { ok: true; file: string; provider: string; model: string; seconds: number } | { ok: false; error: string; quota?: boolean };
@@ -34,32 +35,25 @@ export type KeyVisualProgress = {
 
 type Provider = (opts: KeyVisualOptions) => Promise<{ model: string }>;
 
-const NEGATIVE =
-  "text, letters, words, numbers, typography, watermark, logo, signature, frame, border, ui, full frame texture, busy background, pattern, cropped, pedestal, stand, floor, table, horizon, low quality, blurry, jpeg artifacts";
 
 /**
  * Prompt del visual. Los modelos de difusión dan más peso al principio del texto y no entienden
  * colores en hexadecimal: primero la composición, y el fondo descrito con palabras.
  */
-// Las referencias suelen ser piezas de otras marcas: se toma el estilo, nunca el contenido
-const NO_COPY =
-  "Use the attached images ONLY for visual style (technique, palette, line weight, shading, mood). Do NOT reproduce any character, mascot, creature, logo, object or composition that appears in them; the subject must be different.";
 
-// Lo que cada técnica no tiene que tener (se suma al negativo general)
-const NEGATIVE_BY_MEDIUM: Record<string, string> = {
-  "pixel-art": "perspective, 3d, photo, realistic, interior, room, grid, gradient, smooth shading, blur",
-  "flat-vector": "3d, photo, realistic, gradient mesh, texture",
-  "hand-drawn": "3d, photo, realistic",
-  "3d-render": "flat, sketch, photo of people",
-  "line-art-halftone": "3d, photo, realistic, gradient, soft shading, color fill everywhere",
-  risograph: "3d, photo, realistic, glossy, smooth gradient",
-  collage: "3d render, glossy, cartoon",
+// Prompts y fragmentos versionados (packages/agents/prompts): keyvisual, keyvisual-referencia, elements, imagenes.json
+type ImageFragments = { negative: string; negativeByMedium: Record<string, string>; mediumPhrase: Record<string, string> };
+const fragments = () => loadFragments<ImageFragments>("imagenes").data;
+const mediumPhrase = (medium?: string) => fragments().mediumPhrase[medium ?? ""] ?? "";
+const negativeFor = (medium?: string) => [fragments().negative, fragments().negativeByMedium[medium ?? ""]].filter(Boolean).join(", ");
+
+const visualPrompt = (o: KeyVisualOptions) => loadPrompt("keyvisual").render({ subject: o.prompt, medium: mediumPhrase(o.medium), ground: colorName(o.ground) });
+
+/** Versión del prompt usada en una generación de imagen (para la telemetría). */
+export const imagePromptVersion = (withReferences: boolean) => {
+  const p = loadPrompt(withReferences ? "keyvisual-referencia" : "keyvisual");
+  return { id: p.id, version: p.version };
 };
-
-const negativeFor = (medium?: string) => [NEGATIVE, NEGATIVE_BY_MEDIUM[medium ?? ""]].filter(Boolean).join(", ");
-
-const visualPrompt = (o: KeyVisualOptions) =>
-  `${o.prompt}. ${MEDIUM_PHRASE[o.medium ?? ""] ?? ""}. A single subject, centered, no pedestal, no floor, surrounded by lots of negative space, isolated on a plain flat ${colorName(o.ground)} background. No text, no letters, no logos.`;
 
 const toOklch = converter("oklch");
 
@@ -301,10 +295,7 @@ const geminiImage: Provider = async (opts) => {
       ).toString("base64"),
     ),
   );
-  const prompt = opts.raw
-    ? opts.prompt
-    : `${visualPrompt(opts)}
-${NO_COPY} Square format.`;
+  const prompt = opts.raw ? opts.prompt : loadPrompt("keyvisual-referencia").render({ visual: visualPrompt(opts) });
 
   let lastError = "";
   let quota = false;
@@ -357,17 +348,6 @@ ${NO_COPY} Square format.`;
 
 // ─── Elementos decorativos del estilo (Gemini) ─────────────────────────────
 
-const MEDIUM_PHRASE: Record<string, string> = {
-  "pixel-art": "high quality pixel art sprite, clean 1px dark outline, 3-tone shading, limited palette, crisp pixels, game asset",
-  "flat-vector": "flat vector illustration, clean shapes, bold colors",
-  "hand-drawn": "hand-drawn illustration with expressive ink lines",
-  "3d-render": "glossy 3D render, studio lighting",
-  photo: "photographic object",
-  "abstract-gradient": "abstract shape with smooth gradients",
-  "line-art-halftone": "quirky cartoon line art with thick black outlines, white fill and halftone dot shading, retro comic sticker",
-  risograph: "risograph print illustration, two or three flat spot colors, visible grain and slight misregistration",
-  collage: "paper cut-out collage, torn edges, layered flat colors, analog texture",
-};
 
 /**
  * Genera elementos decorativos en el estilo exacto de la referencia (uno por sujeto, en paralelo),
@@ -386,7 +366,7 @@ export async function generateStyleElements(opts: {
   await Promise.all(
     opts.subjects.slice(0, 4).map(async (subject, i) => {
       const outFile = join(opts.outDir, `${i + 1}.png`);
-      const prompt = `${subject}. ${MEDIUM_PHRASE[opts.medium ?? ""] ?? ""}. A single small decorative element, centered, isolated on a plain flat white background, in the exact visual style of the attached reference (same line weight, palette and shading). ${NO_COPY} No text, no letters, no logos.`;
+      const prompt = loadPrompt("elements").render({ subject, medium: mediumPhrase(opts.medium) });
       try {
         await geminiImage({
           references: opts.references,

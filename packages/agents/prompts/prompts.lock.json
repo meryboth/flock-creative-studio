@@ -1,0 +1,38 @@
+{
+  "copy": {
+    "version": 1,
+    "hash": "c24c9b47bdd2e3dd"
+  },
+  "critic": {
+    "version": 1,
+    "hash": "9e1aef595fcbeee1"
+  },
+  "editor": {
+    "version": 1,
+    "hash": "64766e21780fb9de"
+  },
+  "elements": {
+    "version": 1,
+    "hash": "e88660472d7fd787"
+  },
+  "keyvisual-referencia": {
+    "version": 1,
+    "hash": "59ff3fc7f9152d0b"
+  },
+  "keyvisual": {
+    "version": 1,
+    "hash": "4e4fad55f90dab67"
+  },
+  "reference": {
+    "version": 1,
+    "hash": "37cd8ee99a8f1eb7"
+  },
+  "verifier": {
+    "version": 1,
+    "hash": "f810bb646b06e31a"
+  },
+  "imagenes": {
+    "version": 1,
+    "hash": "b8c9b7c48180fe6a"
+  }
+}

@@ -12,6 +12,7 @@ import { getLibraryStyle } from "@/lib/style-library";
 import { keyVisualPath, readReference } from "@/lib/reference";
 import { uploadElements } from "@/lib/reference";
 import { createEvent, runGeneration, setEventGraphics, type StyleChoice } from "@/lib/studio";
+import { track } from "@/lib/telemetry";
 
 export type FormState = { error?: string; field?: string };
 
@@ -103,6 +104,20 @@ export async function createEventAction(_prev: FormState, form: FormData): Promi
     }
   }
   if (graphics.keyVisual || graphics.elements) await setEventGraphics(id, graphics);
+
+  track("event.created", {
+    eventId: id,
+    props: {
+      styleId,
+      fromLibrary: Boolean(style.libraryStyleId),
+      fromReference: styleId === "referencia" && !style.libraryStyleId,
+      aiGraphics: Boolean(graphics.keyVisual || graphics.elements),
+      outputs,
+      agendaItems: agenda.length,
+      attendees: attendees.length,
+      language: get("language") === "en" ? "en" : "es",
+    },
+  });
 
   // La generación (LLM + render) tarda: corre después de responder y la página muestra el progreso
   after(() => runGeneration(id));

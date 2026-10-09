@@ -6,6 +6,7 @@ import { momentOf, type EventContent, type Moment } from "@flock/templates";
 import { linkedinStatus, publishToLinkedIn } from "./connectors/linkedin";
 import { cancelInSlack, publishToSlack, scheduleInSlack, slackStatus } from "./connectors/slack";
 import { STORAGE_DIR } from "./paths";
+import { track } from "./telemetry";
 
 export type Channel = "slack" | "linkedin";
 
@@ -89,6 +90,7 @@ export async function schedulePost(input: { eventId: string; channel: Channel; m
         scheduledAt: input.scheduledAt,
       })
       .returning();
+    track("post.scheduled", { eventId: input.eventId, props: { channel: input.channel, moment: input.moment } });
     return row;
   });
 }
@@ -97,6 +99,7 @@ export async function cancelPost(postId: string) {
   const [post] = await db.select().from(schema.scheduledPosts).where(eq(schema.scheduledPosts.id, postId));
   // Si ya estaba programada en Slack mismo, se borra también allá
   if (post?.externalUrl?.startsWith("slack:scheduled:")) await cancelInSlack(post.externalUrl);
+  if (post) track("post.cancelled", { eventId: post.eventId, props: { channel: post.channel } });
   await db
     .update(schema.scheduledPosts)
     .set({ status: "cancelled" })
@@ -133,10 +136,12 @@ async function publish(post: typeof schema.scheduledPosts.$inferSelect) {
       .update(schema.scheduledPosts)
       .set({ status: "published", publishedAt: new Date(), externalUrl: result.url, text, publishedVia: "app" })
       .where(eq(schema.scheduledPosts.id, post.id));
+    track("post.published", { eventId: post.eventId, props: { channel: post.channel, via: "app" } });
     return result;
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
     await db.update(schema.scheduledPosts).set({ status: "failed", error }).where(eq(schema.scheduledPosts.id, post.id));
+    track("post.published", { eventId: post.eventId, ok: false, props: { channel: post.channel, via: "app", error: error.slice(0, 200) } });
     throw new Error(error);
   }
 }
@@ -213,6 +218,7 @@ export async function scheduleSlackPost(input: { eventId: string; pieceFile: str
       scheduledAt: input.scheduledAt,
     })
     .returning();
+  track("post.scheduled", { eventId: input.eventId, props: { channel: "slack", moment: piece.moment, piece: piece.file.split("/")[0], connected: slackStatus().connected } });
   // Con la app de Slack conectada y la programación nativa activa, Slack la publica aunque la app esté cerrada
   if (slackStatus().connected && slackStatus().nativeSchedule) {
     await scheduleInSlack({ file: join(STORAGE_DIR, input.eventId, piece.file), text: row.text, channel: row.target!, at: row.scheduledAt })
@@ -250,8 +256,10 @@ export async function knownSlackChannels() {
 
 /** Marca una publicación como hecha a mano (sin conector). */
 export async function markPublished(postId: string) {
-  await db
+  const [row] = await db
     .update(schema.scheduledPosts)
     .set({ status: "published", publishedAt: new Date(), publishedVia: "manual", error: null })
-    .where(and(eq(schema.scheduledPosts.id, postId), ne(schema.scheduledPosts.status, "cancelled")));
+    .where(and(eq(schema.scheduledPosts.id, postId), ne(schema.scheduledPosts.status, "cancelled")))
+    .returning();
+  if (row) track("post.published", { eventId: row.eventId, props: { channel: row.channel, via: "manual", lateMinutes: Math.round((Date.now() - +row.scheduledAt) / 60000) } });
 }

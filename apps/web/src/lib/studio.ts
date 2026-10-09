@@ -5,9 +5,11 @@ import { join } from "node:path";
 import { asc, desc, eq } from "drizzle-orm";
 import { db, schema } from "@flock/db";
 import { writeEventCopy } from "@flock/agents";
-import { adjustFrom, generateFamily, loadRoster, outputsOf, type OutputId, type Overrides, type RosterSource } from "@flock/studio";
+import { adjustFrom, generateFamily, loadRoster, manualMinutes, outputsOf, type OutputId, type Overrides, type RosterSource } from "@flock/studio";
 import { buildKit, type AgendaItem, type Attendee, type EventContent, type Language, type ReferenceStyle, type StyleId } from "@flock/templates";
 import { REPO_ROOT, STORAGE_DIR } from "./paths";
+import { flushTelemetry, setTelemetryContext, track, withTelemetry } from "./telemetry";
+import { sql } from "drizzle-orm";
 
 export type StyleChoice = {
   styleId: StyleId;
@@ -101,12 +103,23 @@ async function loadEventData(id: string) {
  * va dejando el progreso en `runs` para que la UI lo muestre.
  * @param rewriteCopy si es false, reutiliza los textos ya generados (ej. al cambiar solo la variante)
  */
-export async function runGeneration(eventId: string, { rewriteCopy = true } = {}) {
+export function runGeneration(eventId: string, opts: { rewriteCopy?: boolean } = {}) {
+  // Todo lo que pase adentro (llamadas a modelos, acciones) queda asociado al evento y a la corrida
+  return withTelemetry({ eventId }, () => generate(eventId, opts));
+}
+
+async function generate(eventId: string, { rewriteCopy = true }: { rewriteCopy?: boolean }) {
+  const t0 = Date.now();
   const [run] = await db
     .insert(schema.runs)
     .values({ eventId, graph: "family", threadId: randomUUID(), status: "running", stage: "Preparando" })
     .returning({ id: schema.runs.id });
   const update = (values: Partial<typeof schema.runs.$inferInsert>) => db.update(schema.runs).set(values).where(eq(schema.runs.id, run.id));
+  setTelemetryContext({ runId: run.id });
+  track("generation.started", { props: { rewriteCopy } });
+  // Pasos de la corrida con su duración (tabla run_steps)
+  const step = (node: string, durationMs: number, output?: unknown) =>
+    db.insert(schema.runSteps).values({ runId: run.id, node, durationMs: Math.round(durationMs), output: output ?? null }).catch(() => undefined);
 
   try {
     const { event, agenda, attendees: own } = await loadEventData(eventId);
@@ -147,9 +160,11 @@ export async function runGeneration(eventId: string, { rewriteCopy = true } = {}
     // Eventos anteriores a Slack y a los momentos (antes / durante / después): se redactan de nuevo
     if (rewriteCopy || !content || !content.slack) {
       await update({ stage: "Redactando los textos con IA" });
+      const tCopy = Date.now();
       const copy = await writeEventCopy({ event: kit.event, agenda });
       if (copy.error) console.warn(`[textos] ${copy.source}: ${copy.error}`);
       lastCopyError = copy.error ?? null;
+      await step("copy", Date.now() - tCopy, { source: copy.source, model: copy.model ?? null });
       content = copy.content;
       await db.update(schema.events).set({ content, contentSource: copy.source === "llm" ? (copy.model ?? "llm") : "fallback", hashtag: kit.event.hashtag }).where(eq(schema.events.id, eventId));
     }
@@ -200,7 +215,33 @@ export async function runGeneration(eventId: string, { rewriteCopy = true } = {}
       stage: `Piezas generadas en ${result.seconds.toFixed(0)} s · ${qaSummary(result)} · QA de diseño: ${result.qaReport.split("\n").pop()}`,
       error: contentSource === "fallback" ? lastCopyError : null,
     });
+    const checks = Object.values(result.checks);
+    await step("render", result.seconds * 1000, { pieces: result.pieces.length, verified: result.verified });
+    // Costo de la corrida (suma de sus llamadas a modelos) y tiempo ahorrado contra la línea base manual
+    const manual = manualMinutes(result.pieces);
+    const machineSeconds = (Date.now() - t0) / 1000;
+    await flushTelemetry();
+    const [{ cost }] = (await db.execute(sql`select coalesce(sum(cost_usd), 0) as cost from llm_calls where run_id = ${run.id}`)) as unknown as { cost: string }[];
+    await update({ costUsd: Number(cost), manualMinutes: manual, machineSeconds });
+    track("generation.finished", {
+      durationMs: Date.now() - t0,
+      props: {
+        rewriteCopy,
+        pieces: result.pieces.length,
+        verified: result.verified,
+        review: checks.filter((c) => c.issues.length || c.reading?.length).length,
+        autoFixed: checks.filter((c) => c.autoFixed).length,
+        readingProblems: checks.reduce((n, c) => n + (c.reading?.length ?? 0), 0),
+        contentSource,
+        costUsd: Number(cost),
+        manualMinutes: manual,
+        machineSeconds: Math.round(machineSeconds),
+        layout: kit.style.layout,
+        styleId: style.styleId,
+      },
+    });
   } catch (err) {
+    track("generation.failed", { ok: false, durationMs: Date.now() - t0, props: { error: err instanceof Error ? err.message.slice(0, 300) : String(err) } });
     console.error("Generación fallida", err);
     await update({ status: "failed", error: err instanceof Error ? err.message : String(err) });
     // Sale de "producing" para que la página muestre el error y permita reintentar
@@ -252,8 +293,10 @@ export async function syncRoster(eventId: string, input: { url: string } | { fil
       };
       await tx.update(schema.events).set({ roster: info, status: "producing" }).where(eq(schema.events.id, eventId));
     });
+    track("roster.loaded", { eventId, props: { source: roster.source, count: roster.attendees.length, presencial } });
     return { count: roster.attendees.length, presencial };
   } catch (err) {
+    track("roster.loaded", { eventId, ok: false, props: { source: source.kind, error: err instanceof Error ? err.message.slice(0, 200) : String(err) } });
     // Se recuerda el link aunque falle, para reintentar sin volver a pegarlo
     const error = err instanceof Error ? err.message : String(err);
     const prev = event.roster as RosterInfo | null;
@@ -275,6 +318,7 @@ export async function lastRosterUrl() {
 export async function setOutputs(eventId: string, outputs: OutputId[]) {
   if (!outputs.length) throw new Error("Elegí al menos un tipo de pieza");
   await db.update(schema.events).set({ outputs, status: "producing" }).where(eq(schema.events.id, eventId));
+  track("outputs.changed", { eventId, props: { outputs } });
 }
 
 /** Resumen del control de calidad para la línea de estado del evento. */

@@ -13,9 +13,13 @@
     "db:studio": "pnpm --filter @flock/db studio",
     "bootstrap": "pnpm db:up && pnpm db:migrate && pnpm db:seed && pnpm --filter @flock/templates build",
     "render:event": "pnpm --filter @flock/templates build && tsx tools/render-event.ts",
-    "diversity": "pnpm --filter @flock/templates build && tsx --env-file=.env tools/diversity-sheet.ts"
+    "diversity": "pnpm --filter @flock/templates build && tsx --env-file-if-exists=.env tools/diversity-sheet.ts",
+    "evals": "pnpm --filter @flock/templates build && tsx --env-file-if-exists=.env tools/evals/run.ts",
+    "prompts:lock": "tsx tools/prompts-lock.ts",
+    "test": "pnpm --filter @flock/templates build && vitest run"
   },
   "devDependencies": {
-    "tsx": "^4.23.15"
+    "tsx": "^4.23.15",
+    "vitest": "3.2.4"
   }
 }

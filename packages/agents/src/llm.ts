@@ -46,6 +46,9 @@ export type LlmCallRecord = {
   inputTokens?: number;
   outputTokens?: number;
   error?: string;
+  promptId?: string; // prompt versionado que se usó (packages/agents/prompts)
+  promptVersion?: number;
+  images?: number; // generación de imágenes: cantidad (el costo es por imagen)
 };
 
 // En globalThis: la app (Next) puede cargar este módulo más de una vez y el observador tiene que ser uno solo
@@ -80,7 +83,7 @@ export async function invokeStructured<S extends z.ZodType>(
   task: Task,
   schema: S,
   input: BaseLanguageModelInput,
-  { name, temperature, timeoutMs }: { name: string; temperature: number; timeoutMs: number },
+  { name, temperature, timeoutMs, prompt }: { name: string; temperature: number; timeoutMs: number; prompt?: { id: string; version: number } },
 ): Promise<{ out: z.infer<S>; model: string }> {
   const enabled = providers();
   if (!enabled.length) throw new Error("No hay proveedor de LLM configurado (ANTHROPIC_API_KEY o GOOGLE_API_KEY)");
@@ -100,11 +103,22 @@ export async function invokeStructured<S extends z.ZodType>(
           .invoke(input, { signal: AbortSignal.timeout(timeoutMs) })) as unknown as { raw: { usage_metadata?: { input_tokens?: number; output_tokens?: number } }; parsed: z.infer<S> | null };
         if (res.parsed == null) throw new Error("respuesta sin el formato pedido");
         const usage = res.raw?.usage_metadata;
-        reportLlmCall({ task: label, provider, model, attempt, ok: true, latencyMs: Date.now() - t0, inputTokens: usage?.input_tokens, outputTokens: usage?.output_tokens });
+        reportLlmCall({
+          task: label,
+          provider,
+          model,
+          attempt,
+          ok: true,
+          latencyMs: Date.now() - t0,
+          inputTokens: usage?.input_tokens,
+          outputTokens: usage?.output_tokens,
+          promptId: prompt?.id,
+          promptVersion: prompt?.version,
+        });
         return { out: res.parsed, model: `${provider}:${model}` };
       } catch (err) {
         const message = err instanceof Error ? err.message.split("\n")[0] : String(err);
-        reportLlmCall({ task: label, provider, model, attempt, ok: false, latencyMs: Date.now() - t0, error: message.slice(0, 500) });
+        reportLlmCall({ task: label, provider, model, attempt, ok: false, latencyMs: Date.now() - t0, error: message.slice(0, 500), promptId: prompt?.id, promptVersion: prompt?.version });
         errors.push(`${provider}:${model}: ${message}`);
       }
     }

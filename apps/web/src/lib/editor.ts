@@ -9,6 +9,7 @@ import { addPatch, groupOf, GROUP_LABEL, type Overrides, type Patch, type PieceG
 import { buildKit, STYLES, type EventContent, type Language } from "@flock/templates";
 import { REPO_ROOT, STORAGE_DIR, UPLOADS_DIR } from "./paths";
 import type { StyleChoice } from "./studio";
+import { track, withTelemetry } from "./telemetry";
 
 export type Scope = { kind: "all" } | { kind: "group"; group: PieceGroup } | { kind: "piece"; file: string };
 
@@ -99,7 +100,8 @@ export async function proposeChange(eventId: string, message: string, pieceFile:
   const target = piece ? copyTargetOf(piece.file!) : null;
   const post = target ? (event.content as EventContent | null)?.[target.channel]?.find((p) => p.id === target.id) : undefined;
 
-  const proposal = await interpretEdit({
+  const t0 = Date.now();
+  const proposal = await withTelemetry({ eventId }, () => interpretEdit({
     message,
     event: { name: event.name, style: style.styleId === "referencia" ? "derivado de una referencia" : STYLES[style.styleId].name },
     palette: { ground: kit.style.palette.ground, ink: kit.style.palette.ink, accent: kit.style.palette.accent, accent2: kit.style.palette.accent2 },
@@ -109,7 +111,7 @@ export async function proposeChange(eventId: string, message: string, pieceFile:
       ? { file: piece.file!, label: (piece.data as { label?: string }).label ?? piece.file!, group: GROUP_LABEL[groupOf(piece.type as PieceType)], headline: post?.headline, body: post?.body }
       : null,
     canRegenerateGraphics: Boolean(style.reference),
-  });
+  }));
   // setCopy solo tiene sentido sobre un posteo o mensaje elegido
   const operations = proposal.operations.filter((o) => o.op !== "setCopy" || post);
 
@@ -117,6 +119,11 @@ export async function proposeChange(eventId: string, message: string, pieceFile:
     .insert(schema.changeSets)
     .values({ eventId, message, pieceFile, reply: proposal.reply, operations, suggestedScope: proposal.scope })
     .returning();
+  track("change.proposed", {
+    eventId,
+    durationMs: Date.now() - t0,
+    props: { ops: operations.map((o) => o.op), suggestedScope: proposal.scope, piece: piece ? groupOf(piece.type as PieceType) : null, empty: !operations.length },
+  });
   return {
     id: row.id,
     reply: proposal.reply,
@@ -184,11 +191,13 @@ export async function applyChange(changeId: string, scope: Scope) {
     await tx.update(schema.events).set({ overrides, content, style, status: "producing" }).where(eq(schema.events.id, change.eventId));
     await tx.update(schema.changeSets).set({ status: "applied", scope, before }).where(eq(schema.changeSets.id, changeId));
   });
+  track("change.applied", { eventId: change.eventId, props: { ops: ops.map((o) => o.op), scope: scope.kind, suggested: change.suggestedScope } });
   return change.eventId;
 }
 
 export async function discardChange(changeId: string) {
-  await db.update(schema.changeSets).set({ status: "discarded" }).where(eq(schema.changeSets.id, changeId));
+  const [row] = await db.update(schema.changeSets).set({ status: "discarded" }).where(eq(schema.changeSets.id, changeId)).returning();
+  if (row) track("change.discarded", { eventId: row.eventId, props: { ops: (row.operations as EditOperation[]).map((o) => o.op) } });
 }
 
 /** Deshace el último cambio aplicado: restaura la foto previa. */
@@ -208,6 +217,7 @@ export async function undoLastChange(eventId: string) {
       .where(eq(schema.events.id, eventId));
     await tx.update(schema.changeSets).set({ status: "reverted" }).where(eq(schema.changeSets.id, last.id));
   });
+  track("change.undone", { eventId, props: { ops: (last.operations as EditOperation[]).map((o) => o.op) } });
   return true;
 }
 
